@@ -47,7 +47,8 @@ export default Object.assign([
       replace({
         'OpenPGP.js VERSION': `OpenPGP.js ${pkg.version}`,
         'require(': 'void(',
-        delimiters: ['', '']
+        delimiters: ['', ''],
+        preventAssignment: true
       })
     ]
   }

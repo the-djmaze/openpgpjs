@@ -19,18 +19,8 @@
 import * as stream from '@openpgp/web-stream-tools';
 import util from '../util';
 
-let encodeChunk;
-let decodeChunk;
-if (Buffer) {
-  encodeChunk = buf => Buffer.from(buf).toString('base64');
-  decodeChunk = str => {
-    const b = Buffer.from(str, 'base64');
-    return new Uint8Array(b.buffer, b.byteOffset, b.byteLength);
-  };
-} else {
-  encodeChunk = buf => btoa(util.uint8ArrayToString(buf));
-  decodeChunk = str => util.stringToUint8Array(atob(str));
-}
+let encodeChunk = buf => btoa(util.uint8ArrayToString(buf));
+let decodeChunk = str => util.stringToUint8Array(atob(str));
 
 /**
  * Convert binary array to radix-64

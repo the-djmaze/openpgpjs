@@ -27,8 +27,6 @@ import util from '../../util';
 import enums from '../../enums';
 
 const webCrypto = util.getWebCrypto();
-const nodeCrypto = util.getNodeCrypto();
-const Buffer = util.getNodeBuffer();
 
 const blockLength = 16;
 const ivLength = 12; // size of the IV in bytes
@@ -76,25 +74,6 @@ async function GCM(cipher, key) {
           return AES_GCM.decrypt(ct, key, iv, adata);
         }
         const pt = await webCrypto.decrypt({ name: ALGO, iv, additionalData: adata, tagLength: tagLength * 8 }, _key, ct);
-        return new Uint8Array(pt);
-      }
-    };
-  }
-
-  if (util.getNodeCrypto()) { // Node crypto library
-    return {
-      encrypt: async function(pt, iv, adata = new Uint8Array()) {
-        const en = new nodeCrypto.createCipheriv('aes-' + (key.length * 8) + '-gcm', key, iv);
-        en.setAAD(adata);
-        const ct = Buffer.concat([en.update(pt), en.final(), en.getAuthTag()]); // append auth tag to ciphertext
-        return new Uint8Array(ct);
-      },
-
-      decrypt: async function(ct, iv, adata = new Uint8Array()) {
-        const de = new nodeCrypto.createDecipheriv('aes-' + (key.length * 8) + '-gcm', key, iv);
-        de.setAAD(adata);
-        de.setAuthTag(ct.slice(ct.length - tagLength, ct.length)); // read auth tag at end of ciphertext
-        const pt = Buffer.concat([de.update(ct.slice(0, ct.length - tagLength)), de.final()]);
         return new Uint8Array(pt);
       }
     };
