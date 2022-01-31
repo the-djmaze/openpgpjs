@@ -193,7 +193,7 @@ function verifyHeaders(headers) {
       throw new Error('Improperly formatted armor header: ' + headers[i]);
     }
     if (!/^(Version|Comment|MessageID|Hash|Charset): .+$/.test(headers[i])) {
-      util.printDebugError(new Error('Unknown header: ' + headers[i]));
+      console.error(new Error('Unknown header: ' + headers[i]));
     }
   }
 }

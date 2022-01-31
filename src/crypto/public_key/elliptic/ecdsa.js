@@ -61,7 +61,7 @@ export async function sign(oid, hashAlgo, message, publicKey, privateKey, hashed
           if (curve.name !== 'p521' && (err.name === 'DataError' || err.name === 'OperationError')) {
             throw err;
           }
-          util.printDebugError('Browser did not support signing: ' + err.message);
+          console.error('Browser did not support signing: ' + err.message);
         }
         break;
       }
@@ -97,7 +97,7 @@ export async function verify(oid, hashAlgo, signature, message, publicKey, hashe
           if (curve.name !== 'p521' && (err.name === 'DataError' || err.name === 'OperationError')) {
             throw err;
           }
-          util.printDebugError('Browser did not support verifying: ' + err.message);
+          console.error('Browser did not support verifying: ' + err.message);
         }
         break;
     }

@@ -86,7 +86,7 @@ class Key {
             case enums.signature.certCasual:
             case enums.signature.certPositive:
               if (!user) {
-                util.printDebug('Dropping certification signatures without preceding user packet');
+                console.log('Dropping certification signatures without preceding user packet');
                 continue;
               }
               if (packet.issuerKeyID.equals(primaryKeyID)) {
@@ -107,7 +107,7 @@ class Key {
               break;
             case enums.signature.subkeyBinding:
               if (!subkey) {
-                util.printDebug('Dropping subkey binding signature without preceding subkey packet');
+                console.log('Dropping subkey binding signature without preceding subkey packet');
                 continue;
               }
               subkey.bindingSignatures.push(packet);
@@ -117,7 +117,7 @@ class Key {
               break;
             case enums.signature.subkeyRevocation:
               if (!subkey) {
-                util.printDebug('Dropping subkey revocation signature without preceding subkey packet');
+                console.log('Dropping subkey revocation signature without preceding subkey packet');
                 continue;
               }
               subkey.revocationSignatures.push(packet);

@@ -26,13 +26,6 @@
 import * as stream from '@openpgp/web-stream-tools';
 import { getBigInteger } from './biginteger';
 
-const debugMode = (() => {
-  try {
-    return process.env.NODE_ENV === 'development'; // eslint-disable-line no-process-env
-  } catch (e) {}
-  return false;
-})();
-
 const util = {
   isString: data => typeof data === 'string' || Object.prototype.isPrototypeOf.call(data, String),
 
@@ -278,28 +271,6 @@ const util = {
     return util.writeNumber(s, 2);
   },
 
-  /**
-   * Helper function to print a debug message. Debug
-   * messages are only printed if
-   * @param {String} str - String of the debug message
-   */
-  printDebug(str) {
-    if (debugMode) {
-      console.log(str);
-    }
-  },
-
-  /**
-   * Helper function to print a debug error. Debug
-   * messages are only printed if
-   * @param {String} str - String of the debug message
-   */
-  printDebugError(error) {
-    if (debugMode) {
-      console.error(error);
-    }
-  },
-
   // returns bit length of the integer x
   nbits(x) {
     let r = 1;
@@ -374,7 +345,7 @@ const util = {
    * @returns {Object} The SubtleCrypto api or 'undefined'.
    */
   getWebCrypto() {
-    return typeof globalThis !== 'undefined' && globalThis.crypto && globalThis.crypto.subtle;
+    return crypto.subtle;
   },
 
   /**

@@ -150,7 +150,7 @@ class Curve {
         try {
           return await webGenKeyPair(this.name);
         } catch (err) {
-          util.printDebugError('Browser did not support generating ec key ' + err.message);
+          console.error('Browser did not support generating ec key ' + err.message);
           break;
         }
       case 'curve25519': {

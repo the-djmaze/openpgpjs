@@ -518,7 +518,7 @@ class SignaturePacket {
         if (critical) {
           throw err;
         } else {
-          util.printDebug(err);
+          console.log(err);
         }
       }
     }

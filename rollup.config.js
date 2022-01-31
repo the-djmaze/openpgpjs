@@ -5,7 +5,6 @@ import { builtinModules } from 'module';
 import resolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
 import replace from '@rollup/plugin-replace';
-import { terser } from 'rollup-plugin-terser';
 
 import pkg from './package.json';
 
@@ -18,23 +17,11 @@ const banner =
 
 const intro = "const globalThis = window;";
 
-const terserOptions = {
-  ecma: 2017,
-  compress: {
-    unsafe: true
-  },
-  output: {
-    comments: '/^(?:!|#__)/',
-    preserve_annotations: true
-  }
-};
-
 export default Object.assign([
   {
     input: 'src/index.js',
     output: [
-      { file: 'dist/openpgp.js', format: 'iife', name: pkg.name, banner, intro },
-      { file: 'dist/openpgp.min.js', format: 'iife', name: pkg.name, banner, intro, plugins: [terser(terserOptions)] }
+      { file: 'dist/openpgp.js', format: 'iife', name: pkg.name, banner }
     ],
     inlineDynamicImports: true,
     plugins: [

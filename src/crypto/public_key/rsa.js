@@ -49,7 +49,7 @@ export async function sign(hashAlgo, data, n, e, d, p, q, u, hashed) {
       try {
         return await webSign(enums.read(enums.webHash, hashAlgo), data, n, e, d, p, q, u);
       } catch (err) {
-        util.printDebugError(err);
+        console.error(err);
       }
     }
   }
@@ -73,7 +73,7 @@ export async function verify(hashAlgo, data, s, n, e, hashed) {
       try {
         return await webVerify(enums.read(enums.webHash, hashAlgo), data, s, n, e);
       } catch (err) {
-        util.printDebugError(err);
+        console.error(err);
       }
     }
   }

@@ -90,7 +90,7 @@ class PacketList extends Array {
                 // (since we likely cannot process the message without these packets anyway).
                 await writer.abort(e);
               }
-              util.printDebugError(e);
+              console.error(e);
             }
           });
           if (done) {

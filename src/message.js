@@ -130,7 +130,7 @@ export class Message {
         const algo = enums.write(enums.symmetric, algorithmName);
         await symEncryptedPacket.decrypt(algo, data, config);
       } catch (e) {
-        util.printDebugError(e);
+        console.error(e);
         exception = e;
       }
     }));
@@ -182,7 +182,7 @@ export class Message {
             await skeskPacket.decrypt(password);
             decryptedSessionKeyPackets.push(skeskPacket);
           } catch (err) {
-            util.printDebugError(err);
+            console.error(err);
           }
         }));
       }));
@@ -248,7 +248,7 @@ export class Message {
                   decryptedSessionKeyPackets.push(pkeskPacketCopy);
                 } catch (err) {
                   // `decrypt` can still throw some non-security-sensitive errors
-                  util.printDebugError(err);
+                  console.error(err);
                   exception = err;
                 }
               }));
@@ -261,7 +261,7 @@ export class Message {
                 }
                 decryptedSessionKeyPackets.push(pkeskPacket);
               } catch (err) {
-                util.printDebugError(err);
+                console.error(err);
                 exception = err;
               }
             }

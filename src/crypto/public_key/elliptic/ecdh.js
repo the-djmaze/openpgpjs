@@ -104,7 +104,7 @@ async function genPublicEphemeralKey(curve, Q) {
         try {
           return await webPublicEphemeralKey(curve, Q);
         } catch (err) {
-          util.printDebugError(err);
+          console.error(err);
         }
       }
       break;
@@ -162,7 +162,7 @@ async function genPrivateEphemeralKey(curve, V, Q, d) {
         try {
           return await webPrivateEphemeralKey(curve, V, Q, d);
         } catch (err) {
-          util.printDebugError(err);
+          console.error(err);
         }
       }
       break;
