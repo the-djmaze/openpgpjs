@@ -34,19 +34,15 @@ const debugMode = (() => {
 })();
 
 const util = {
-  isString: function(data) {
-    return typeof data === 'string' || String.prototype.isPrototypeOf(data);
-  },
+  isString: data => typeof data === 'string' || Object.prototype.isPrototypeOf.call(data, String),
 
-  isArray: function(data) {
-    return Array.prototype.isPrototypeOf(data);
-  },
+  isArray: data => Array.isArray(data),
 
   isUint8Array: stream.isUint8Array,
 
   isStream: stream.isStream,
 
-  readNumber: function (bytes) {
+  readNumber(bytes) {
     let n = 0;
     for (let i = 0; i < bytes.length; i++) {
       n += (256 ** i) * bytes[bytes.length - 1 - i];
@@ -54,7 +50,7 @@ const util = {
     return n;
   },
 
-  writeNumber: function (n, bytes) {
+  writeNumber(n, bytes) {
     const b = new Uint8Array(bytes);
     for (let i = 0; i < bytes; i++) {
       b[i] = (n >> (8 * (bytes - i - 1))) & 0xFF;
@@ -63,19 +59,19 @@ const util = {
     return b;
   },
 
-  readDate: function (bytes) {
+  readDate(bytes) {
     const n = util.readNumber(bytes);
     const d = new Date(n * 1000);
     return d;
   },
 
-  writeDate: function (time) {
+  writeDate(time) {
     const numeric = Math.floor(time.getTime() / 1000);
 
     return util.writeNumber(numeric, 4);
   },
 
-  normalizeDate: function (time = Date.now()) {
+  normalizeDate(time = Date.now()) {
     return time === null || time === Infinity ? time : new Date(Math.floor(+time / 1000) * 1000);
   },
 
@@ -84,7 +80,7 @@ const util = {
    * @param {Uint8Array} bytes - Input data to parse
    * @returns {Uint8Array} Parsed MPI.
    */
-  readMPI: function (bytes) {
+  readMPI(bytes) {
     const bits = (bytes[0] << 8) | bytes[1];
     const bytelen = (bits + 7) >>> 3;
     return bytes.subarray(2, 2 + bytelen);
@@ -108,7 +104,7 @@ const util = {
    * @param {Uint8Array} bin - An array of 8-bit integers to convert
    * @returns {Uint8Array} MPI-formatted Uint8Array.
    */
-  uint8ArrayToMPI: function (bin) {
+  uint8ArrayToMPI(bin) {
     const bitSize = util.uint8ArrayBitLength(bin);
     if (bitSize === 0) {
       throw new Error('Zero MPI');
@@ -123,7 +119,7 @@ const util = {
    * @param {Uint8Array} bin input data (big endian)
    * @returns bit length
    */
-  uint8ArrayBitLength: function (bin) {
+  uint8ArrayBitLength(bin) {
     let i; // index of leading non-zero byte
     for (i = 0; i < bin.length; i++) if (bin[i] !== 0) break;
     if (i === bin.length) {
@@ -138,7 +134,7 @@ const util = {
    * @param {String} hex - A hex string to convert
    * @returns {Uint8Array} An array of 8-bit integers.
    */
-  hexToUint8Array: function (hex) {
+  hexToUint8Array(hex) {
     const result = new Uint8Array(hex.length >> 1);
     for (let k = 0; k < hex.length >> 1; k++) {
       result[k] = parseInt(hex.substr(k << 1, 2), 16);
@@ -151,7 +147,7 @@ const util = {
    * @param {Uint8Array} bytes - Array of 8-bit integers to convert
    * @returns {String} Hexadecimal representation of the array.
    */
-  uint8ArrayToHex: function (bytes) {
+  uint8ArrayToHex(bytes) {
     const r = [];
     const e = bytes.length;
     let c = 0;
@@ -171,7 +167,7 @@ const util = {
    * @param {String} str - String to convert
    * @returns {Uint8Array} An array of 8-bit integers.
    */
-  stringToUint8Array: function (str) {
+  stringToUint8Array(str) {
     return stream.transform(str, str => {
       if (!util.isString(str)) {
         throw new Error('stringToUint8Array: Data must be in the form of a string');
@@ -190,7 +186,7 @@ const util = {
    * @param {Uint8Array} bytes - An array of 8-bit integers to convert
    * @returns {String} String representation of the array.
    */
-  uint8ArrayToString: function (bytes) {
+  uint8ArrayToString(bytes) {
     bytes = new Uint8Array(bytes);
     const result = [];
     const bs = 1 << 14;
@@ -207,7 +203,7 @@ const util = {
    * @param {String|ReadableStream} str - The string to convert
    * @returns {Uint8Array|ReadableStream} A valid squence of utf8 bytes.
    */
-  encodeUTF8: function (str) {
+  encodeUTF8(str) {
     const encoder = new TextEncoder('utf-8');
     // eslint-disable-next-line no-inner-declarations
     function process(value, lastChunk = false) {
@@ -221,7 +217,7 @@ const util = {
    * @param {Uint8Array|ReadableStream} utf8 - A valid squence of utf8 bytes
    * @returns {String|ReadableStream} A native javascript string.
    */
-  decodeUTF8: function (utf8) {
+  decodeUTF8(utf8) {
     const decoder = new TextDecoder('utf-8');
     // eslint-disable-next-line no-inner-declarations
     function process(value, lastChunk = false) {
@@ -251,7 +247,7 @@ const util = {
    * @param {Uint8Array} array2 - Second array
    * @returns {Boolean} Equality.
    */
-  equalsUint8Array: function (array1, array2) {
+  equalsUint8Array(array1, array2) {
     if (!util.isUint8Array(array1) || !util.isUint8Array(array2)) {
       throw new Error('Data must be in the form of a Uint8Array');
     }
@@ -274,7 +270,7 @@ const util = {
    * @param {Uint8Array} Uint8Array - To create a sum of
    * @returns {Uint8Array} 2 bytes containing the sum of all charcodes % 65535.
    */
-  writeChecksum: function (text) {
+  writeChecksum(text) {
     let s = 0;
     for (let i = 0; i < text.length; i++) {
       s = (s + text[i]) & 0xFFFF;
@@ -287,7 +283,7 @@ const util = {
    * messages are only printed if
    * @param {String} str - String of the debug message
    */
-  printDebug: function (str) {
+  printDebug(str) {
     if (debugMode) {
       console.log(str);
     }
@@ -298,14 +294,14 @@ const util = {
    * messages are only printed if
    * @param {String} str - String of the debug message
    */
-  printDebugError: function (error) {
+  printDebugError(error) {
     if (debugMode) {
       console.error(error);
     }
   },
 
   // returns bit length of the integer x
-  nbits: function (x) {
+  nbits(x) {
     let r = 1;
     let t = x >>> 16;
     if (t !== 0) {
@@ -344,7 +340,7 @@ const util = {
    *
    * @param {Uint8Array} data
    */
-  double: function(data) {
+  double(data) {
     const doubleVar = new Uint8Array(data.length);
     const last = data.length - 1;
     for (let i = 0; i < last; i++) {
@@ -361,7 +357,7 @@ const util = {
    * than 8)
    * @returns {String} Resulting array.
    */
-  shiftRight: function (array, bits) {
+  shiftRight(array, bits) {
     if (bits) {
       for (let i = array.length - 1; i >= 0; i--) {
         array[i] >>= bits;
@@ -377,16 +373,8 @@ const util = {
    * Get native Web Cryptography api, only the current version of the spec.
    * @returns {Object} The SubtleCrypto api or 'undefined'.
    */
-  getWebCrypto: function() {
+  getWebCrypto() {
     return typeof globalThis !== 'undefined' && globalThis.crypto && globalThis.crypto.subtle;
-  },
-
-  /**
-   * Detect Node.js runtime.
-   */
-  detectNode: function() {
-    return typeof globalThis.process === 'object' &&
-      typeof globalThis.process.versions === 'object';
   },
 
   /**
@@ -403,37 +391,11 @@ const util = {
    */
   getBigInteger,
 
-  /**
-   * Get native Node.js crypto api.
-   * @returns {Object} The crypto module or 'undefined'.
-   */
-  getNodeCrypto: function() {
-    return require('crypto');
-  },
-
-  getNodeZlib: function() {
-    return require('zlib');
-  },
-
-  /**
-   * Get native Node.js Buffer constructor. This should be used since
-   * Buffer is not available under browserify.
-   * @returns {Function} The Buffer constructor or 'undefined'.
-   */
-  getNodeBuffer: function() {
-    return (require('buffer') || {}).Buffer;
-  },
-
-  getHardwareConcurrency: function() {
-    if (util.detectNode()) {
-      const os = require('os');
-      return os.cpus().length;
-    }
-
+  getHardwareConcurrency() {
     return navigator.hardwareConcurrency || 1;
   },
 
-  isEmailAddress: function(data) {
+  isEmailAddress(data) {
     if (!util.isString(data)) {
       return false;
     }
@@ -445,7 +407,7 @@ const util = {
    * Normalize line endings to <CR><LF>
    * Support any encoding where CR=0x0D, LF=0x0A
    */
-  canonicalizeEOL: function(data) {
+  canonicalizeEOL(data) {
     const CR = 13;
     const LF = 10;
     let carryOverCR = false;
@@ -495,7 +457,7 @@ const util = {
    * Convert line endings from canonicalized <CR><LF> to native <LF>
    * Support any encoding where CR=0x0D, LF=0x0A
    */
-  nativeEOL: function(data) {
+  nativeEOL(data) {
     const CR = 13;
     const LF = 10;
     let carryOverCR = false;
@@ -530,7 +492,7 @@ const util = {
   /**
    * Remove trailing spaces and tabs from each line
    */
-  removeTrailingSpaces: function(text) {
+  removeTrailingSpaces(text) {
     return text.split('\n').map(line => {
       let i = line.length - 1;
       for (; i >= 0 && (line[i] === ' ' || line[i] === '\t'); i--);
@@ -538,7 +500,7 @@ const util = {
     }).join('\n');
   },
 
-  wrapError: function(message, error) {
+  wrapError(message, error) {
     if (!error) {
       return new Error(message);
     }
@@ -557,7 +519,7 @@ const util = {
    * @param {Array<Object>} allowedClasses
    * @returns {Object} map from enum.packet to corresponding *Packet class
    */
-  constructAllowedPackets: function(allowedClasses) {
+  constructAllowedPackets(allowedClasses) {
     const map = {};
     allowedClasses.forEach(PacketClass => {
       if (!PacketClass.tag) {
@@ -576,7 +538,7 @@ const util = {
    * @return {Promise<Any>} Promise resolving to the result of the fastest fulfilled promise
    *                          or rejected with the Error of the last resolved Promise (if all promises are rejected)
    */
-  anyPromise: function(promises) {
+  anyPromise(promises) {
     return new Promise(async (resolve, reject) => {
       let exception;
       await Promise.all(promises.map(async promise => {
@@ -597,7 +559,7 @@ const util = {
    * @param {Uint8Array} b
    * @returns `a` if `cond` is true, `b` otherwise
    */
-  selectUint8Array: function(cond, a, b) {
+  selectUint8Array(cond, a, b) {
     const length = Math.max(a.length, b.length);
     const result = new Uint8Array(length);
     let end = 0;
@@ -615,7 +577,7 @@ const util = {
    * @param {Uint8} b
    * @returns `a` if `cond` is true, `b` otherwise
    */
-  selectUint8: function(cond, a, b) {
+  selectUint8(cond, a, b) {
     return (a & (256 - cond)) | (b & (255 + cond));
   }
 };

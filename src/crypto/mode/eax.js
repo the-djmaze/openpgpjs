@@ -28,8 +28,6 @@ import util from '../../util';
 import enums from '../../enums';
 
 const webCrypto = util.getWebCrypto();
-const nodeCrypto = util.getNodeCrypto();
-const Buffer = util.getNodeBuffer();
 
 
 const blockLength = 16;
@@ -56,13 +54,6 @@ async function CTR(key) {
     key = await webCrypto.importKey('raw', key, { name: 'AES-CTR', length: key.length * 8 }, false, ['encrypt']);
     return async function(pt, iv) {
       const ct = await webCrypto.encrypt({ name: 'AES-CTR', counter: iv, length: blockLength * 8 }, key, pt);
-      return new Uint8Array(ct);
-    };
-  }
-  if (util.getNodeCrypto()) { // Node crypto library
-    return async function(pt, iv) {
-      const en = new nodeCrypto.createCipheriv('aes-' + (key.length * 8) + '-ctr', key, iv);
-      const ct = Buffer.concat([en.update(pt), en.final()]);
       return new Uint8Array(ct);
     };
   }

@@ -668,11 +668,6 @@ async function convertStream(data, streaming, encoding = 'utf8') {
   if (streamType === 'array') {
     return stream.readToEnd(data);
   }
-  if (streaming === 'node') {
-    data = stream.webToNode(data);
-    if (encoding !== 'binary') data.setEncoding(encoding);
-    return data;
-  }
   if (streaming === 'web' && streamType === 'ponyfill') {
     return stream.toNativeReadable(data);
   }

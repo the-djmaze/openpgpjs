@@ -24,8 +24,6 @@
  */
 import util from '../util';
 
-const nodeCrypto = util.getNodeCrypto();
-
 /**
  * Buffer for secure random numbers
  */
@@ -103,9 +101,6 @@ export async function getRandomBytes(length) {
   const buf = new Uint8Array(length);
   if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
     crypto.getRandomValues(buf);
-  } else if (nodeCrypto) {
-    const bytes = nodeCrypto.randomBytes(buf.length);
-    buf.set(bytes);
   } else if (randomBuffer.buffer) {
     await randomBuffer.get(buf);
   } else {

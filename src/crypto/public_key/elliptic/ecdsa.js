@@ -29,7 +29,6 @@ import { Curve, webCurves, privateToJWK, rawPublicToJWK, validateStandardParams 
 import { getIndutnyCurve, keyFromPrivate, keyFromPublic } from './indutnyKey';
 
 const webCrypto = util.getWebCrypto();
-const nodeCrypto = util.getNodeCrypto();
 
 /**
  * Sign a message using the provided key
@@ -66,13 +65,6 @@ export async function sign(oid, hashAlgo, message, publicKey, privateKey, hashed
         }
         break;
       }
-      case 'node': {
-        const signature = await nodeSign(curve, hashAlgo, message, keyPair);
-        return {
-          r: signature.r.toArrayLike(Uint8Array),
-          s: signature.s.toArrayLike(Uint8Array)
-        };
-      }
     }
   }
   return ellipticSign(curve, hashed, privateKey);
@@ -108,8 +100,6 @@ export async function verify(oid, hashAlgo, signature, message, publicKey, hashe
           util.printDebugError('Browser did not support verifying: ' + err.message);
         }
         break;
-      case 'node':
-        return nodeVerify(curve, hashAlgo, signature, message, publicKey);
     }
   }
   const digest = (typeof hashAlgo === 'undefined') ? message : hashed;
@@ -134,8 +124,7 @@ export async function validateParams(oid, Q, d) {
   // To speed up the validation, we try to use node- or webcrypto when available
   // and sign + verify a random message
   switch (curve.type) {
-    case 'web':
-    case 'node': {
+    case 'web': {
       const message = await getRandomBytes(8);
       const hashAlgo = enums.hash.sha256;
       const hashed = await hash.digest(hashAlgo, message);
@@ -233,85 +222,5 @@ async function webVerify(curve, hashAlgo, { r, s }, message, publicKey) {
   );
 }
 
-async function nodeSign(curve, hashAlgo, message, keyPair) {
-  const sign = nodeCrypto.createSign(enums.read(enums.hash, hashAlgo));
-  sign.write(message);
-  sign.end();
-  const key = ECPrivateKey.encode({
-    version: 1,
-    parameters: curve.oid,
-    privateKey: Array.from(keyPair.privateKey),
-    publicKey: { unused: 0, data: Array.from(keyPair.publicKey) }
-  }, 'pem', {
-    label: 'EC PRIVATE KEY'
-  });
-
-  return ECDSASignature.decode(sign.sign(key), 'der');
-}
-
-async function nodeVerify(curve, hashAlgo, { r, s }, message, publicKey) {
-  const { default: BN } = await import('bn.js');
-
-  const verify = nodeCrypto.createVerify(enums.read(enums.hash, hashAlgo));
-  verify.write(message);
-  verify.end();
-  const key = SubjectPublicKeyInfo.encode({
-    algorithm: {
-      algorithm: [1, 2, 840, 10045, 2, 1],
-      parameters: curve.oid
-    },
-    subjectPublicKey: { unused: 0, data: Array.from(publicKey) }
-  }, 'pem', {
-    label: 'PUBLIC KEY'
-  });
-  const signature = ECDSASignature.encode({
-    r: new BN(r), s: new BN(s)
-  }, 'der');
-
-  try {
-    return verify.verify(key, signature);
-  } catch (err) {
-    return false;
-  }
-}
-
 // Originally written by Owen Smith https://github.com/omsmith
 // Adapted on Feb 2018 from https://github.com/Brightspace/node-jwk-to-pem/
-
-/* eslint-disable no-invalid-this */
-
-const asn1 = nodeCrypto ? require('asn1.js') : undefined;
-
-const ECDSASignature = nodeCrypto ?
-  asn1.define('ECDSASignature', function() {
-    this.seq().obj(
-      this.key('r').int(),
-      this.key('s').int()
-    );
-  }) : undefined;
-
-const ECPrivateKey = nodeCrypto ?
-  asn1.define('ECPrivateKey', function() {
-    this.seq().obj(
-      this.key('version').int(),
-      this.key('privateKey').octstr(),
-      this.key('parameters').explicit(0).optional().any(),
-      this.key('publicKey').explicit(1).optional().bitstr()
-    );
-  }) : undefined;
-
-const AlgorithmIdentifier = nodeCrypto ?
-  asn1.define('AlgorithmIdentifier', function() {
-    this.seq().obj(
-      this.key('algorithm').objid(),
-      this.key('parameters').optional().any()
-    );
-  }) : undefined;
-
-const SubjectPublicKeyInfo = nodeCrypto ?
-  asn1.define('SubjectPublicKeyInfo', function() {
-    this.seq().obj(
-      this.key('algorithm').use(AlgorithmIdentifier),
-      this.key('subjectPublicKey').bitstr()
-    );
-  }) : undefined;

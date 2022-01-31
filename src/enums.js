@@ -455,7 +455,7 @@ export default {
    * @returns {Integer} enum value if it exists
    * @throws {Error} if the value is invalid
    */
-  write: function(type, e) {
+  write(type, e) {
     if (typeof e === 'number') {
       e = this.read(type, e);
     }
@@ -474,7 +474,7 @@ export default {
    * @returns {String} name of enum value if it exists
    * @throws {Error} if the value is invalid
    */
-  read: function(type, e) {
+  read(type, e) {
     if (!type[byValue]) {
       type[byValue] = [];
       Object.entries(type).forEach(([key, value]) => {

@@ -34,7 +34,6 @@ import { keyFromPublic, keyFromPrivate, getIndutnyCurve } from './indutnyKey';
 import { getCipher } from '../../crypto';
 
 const webCrypto = util.getWebCrypto();
-const nodeCrypto = util.getNodeCrypto();
 
 /**
  * Validate ECDH parameters
@@ -109,8 +108,6 @@ async function genPublicEphemeralKey(curve, Q) {
         }
       }
       break;
-    case 'node':
-      return nodePublicEphemeralKey(curve, Q);
   }
   return ellipticPublicEphemeralKey(curve, Q);
 }
@@ -169,8 +166,6 @@ async function genPrivateEphemeralKey(curve, V, Q, d) {
         }
       }
       break;
-    case 'node':
-      return nodePrivateEphemeralKey(curve, V, d);
   }
   return ellipticPrivateEphemeralKey(curve, V, d);
 }
@@ -344,38 +339,5 @@ async function ellipticPublicEphemeralKey(curve, Q) {
   const S = V.derive(Q.getPublic());
   const len = indutnyCurve.curve.p.byteLength();
   const sharedKey = S.toArrayLike(Uint8Array, 'be', len);
-  return { publicKey, sharedKey };
-}
-
-/**
- * Generate ECDHE secret from private key and public part of ephemeral key using nodeCrypto
- *
- * @param {Curve} curve - Elliptic curve object
- * @param {Uint8Array} V - Public part of ephemeral key
- * @param {Uint8Array} d - Recipient private key
- * @returns {Promise<{secretKey: Uint8Array, sharedKey: Uint8Array}>}
- * @async
- */
-async function nodePrivateEphemeralKey(curve, V, d) {
-  const recipient = nodeCrypto.createECDH(curve.node.node);
-  recipient.setPrivateKey(d);
-  const sharedKey = new Uint8Array(recipient.computeSecret(V));
-  const secretKey = new Uint8Array(recipient.getPrivateKey());
-  return { secretKey, sharedKey };
-}
-
-/**
- * Generate ECDHE ephemeral key and secret from public key using nodeCrypto
- *
- * @param {Curve} curve - Elliptic curve object
- * @param {Uint8Array} Q - Recipient public key
- * @returns {Promise<{publicKey: Uint8Array, sharedKey: Uint8Array}>}
- * @async
- */
-async function nodePublicEphemeralKey(curve, Q) {
-  const sender = nodeCrypto.createECDH(curve.node.node);
-  sender.generateKeys();
-  const sharedKey = new Uint8Array(sender.computeSecret(Q));
-  const publicKey = new Uint8Array(sender.getPublicKey());
   return { publicKey, sharedKey };
 }

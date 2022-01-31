@@ -19,8 +19,6 @@
 import * as stream from '@openpgp/web-stream-tools';
 import util from '../util';
 
-const Buffer = util.getNodeBuffer();
-
 let encodeChunk;
 let decodeChunk;
 if (Buffer) {

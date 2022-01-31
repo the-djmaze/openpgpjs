@@ -19,16 +19,6 @@ import defaultConfig from '../../config';
 import enums from '../../enums';
 
 const webCrypto = util.getWebCrypto();
-const nodeCrypto = util.getNodeCrypto();
-
-function nodeHash(type) {
-  return async function (data) {
-    const shasum = nodeCrypto.createHash(type);
-    return stream.transform(data, value => {
-      shasum.update(value);
-    }, () => new Uint8Array(shasum.digest()));
-  };
-}
 
 function hashjsHash(hash, webCryptoHash) {
   return async function(data, config = defaultConfig) {
@@ -63,19 +53,7 @@ function asmcryptoHash(hash, webCryptoHash) {
   };
 }
 
-let hashFunctions;
-if (nodeCrypto) { // Use Node native crypto for all hash functions
-  hashFunctions = {
-    md5: nodeHash('md5'),
-    sha1: nodeHash('sha1'),
-    sha224: nodeHash('sha224'),
-    sha256: nodeHash('sha256'),
-    sha384: nodeHash('sha384'),
-    sha512: nodeHash('sha512'),
-    ripemd: nodeHash('ripemd160')
-  };
-} else { // Use JS fallbacks
-  hashFunctions = {
+let hashFunctions = {
     md5: md5,
     sha1: asmcryptoHash(Sha1, (!navigator.userAgent || navigator.userAgent.indexOf('Edge') === -1) && 'SHA-1'),
     sha224: hashjsHash(sha224),
@@ -84,7 +62,6 @@ if (nodeCrypto) { // Use Node native crypto for all hash functions
     sha512: hashjsHash(sha512, 'SHA-512'), // asmcrypto sha512 is huge.
     ripemd: hashjsHash(ripemd160)
   };
-}
 
 export default {
 
@@ -109,7 +86,7 @@ export default {
    * @param {Uint8Array} data - Data to be hashed
    * @returns {Promise<Uint8Array>} Hash value.
    */
-  digest: function(algo, data) {
+  digest(algo, data) {
     switch (algo) {
       case enums.hash.md5:
         return this.md5(data);
@@ -135,7 +112,7 @@ export default {
    * @param {module:enums.hash} algo - Hash algorithm type (See {@link https://tools.ietf.org/html/rfc4880#section-9.4|RFC 4880 9.4})
    * @returns {Integer} Size in bytes of the resulting hash.
    */
-  getHashByteLength: function(algo) {
+  getHashByteLength(algo) {
     switch (algo) {
       case enums.hash.md5:
         return 16;

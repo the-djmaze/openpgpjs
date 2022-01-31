@@ -29,31 +29,6 @@ import { emsaEncode, emeEncode, emeDecode } from '../pkcs1';
 import enums from '../../enums';
 
 const webCrypto = util.getWebCrypto();
-const nodeCrypto = util.getNodeCrypto();
-const asn1 = nodeCrypto ? require('asn1.js') : undefined;
-
-/* eslint-disable no-invalid-this */
-const RSAPrivateKey = util.detectNode() ? asn1.define('RSAPrivateKey', function () {
-  this.seq().obj( // used for native NodeJS crypto
-    this.key('version').int(), // 0
-    this.key('modulus').int(), // n
-    this.key('publicExponent').int(), // e
-    this.key('privateExponent').int(), // d
-    this.key('prime1').int(), // p
-    this.key('prime2').int(), // q
-    this.key('exponent1').int(), // dp
-    this.key('exponent2').int(), // dq
-    this.key('coefficient').int() // u
-  );
-}) : undefined;
-
-const RSAPublicKey = util.detectNode() ? asn1.define('RSAPubliceKey', function () {
-  this.seq().obj( // used for native NodeJS crypto
-    this.key('modulus').int(), // n
-    this.key('publicExponent').int(), // e
-  );
-}) : undefined;
-/* eslint-enable no-invalid-this */
 
 /** Create signature
  * @param {module:enums.hash} hashAlgo - Hash algorithm
@@ -76,8 +51,6 @@ export async function sign(hashAlgo, data, n, e, d, p, q, u, hashed) {
       } catch (err) {
         util.printDebugError(err);
       }
-    } else if (util.getNodeCrypto()) {
-      return nodeSign(hashAlgo, data, n, e, d, p, q, u);
     }
   }
   return bnSign(hashAlgo, n, d, hashed);
@@ -102,8 +75,6 @@ export async function verify(hashAlgo, data, s, n, e, hashed) {
       } catch (err) {
         util.printDebugError(err);
       }
-    } else if (util.getNodeCrypto()) {
-      return nodeVerify(hashAlgo, data, s, n, e);
     }
   }
   return bnVerify(hashAlgo, s, n, e, hashed);
@@ -118,9 +89,6 @@ export async function verify(hashAlgo, data, s, n, e, hashed) {
  * @async
  */
 export async function encrypt(data, n, e) {
-  if (util.getNodeCrypto()) {
-    return nodeEncrypt(data, n, e);
-  }
   return bnEncrypt(data, n, e);
 }
 
@@ -140,9 +108,6 @@ export async function encrypt(data, n, e) {
  * @async
  */
 export async function decrypt(data, n, e, d, p, q, u, randomPayload) {
-  if (util.getNodeCrypto()) {
-    return nodeDecrypt(data, n, e, d, p, q, u, randomPayload);
-  }
   return bnDecrypt(data, n, e, d, p, q, u, randomPayload);
 }
 
@@ -189,35 +154,6 @@ export async function generate(bits, e) {
       q: b64ToUint8Array(jwk.p),
       // Since p and q are switched in places, u is the inverse of jwk.q
       u: b64ToUint8Array(jwk.qi)
-    };
-  } else if (util.getNodeCrypto() && nodeCrypto.generateKeyPair && RSAPrivateKey) {
-    const opts = {
-      modulusLength: bits,
-      publicExponent: e.toNumber(),
-      publicKeyEncoding: { type: 'pkcs1', format: 'der' },
-      privateKeyEncoding: { type: 'pkcs1', format: 'der' }
-    };
-    const prv = await new Promise((resolve, reject) => nodeCrypto.generateKeyPair('rsa', opts, (err, _, der) => {
-      if (err) {
-        reject(err);
-      } else {
-        resolve(RSAPrivateKey.decode(der, 'der'));
-      }
-    }));
-    /**
-     * OpenPGP spec differs from DER spec, DER: `u = (inverse of q) mod p`, OpenPGP: `u = (inverse of p) mod q`.
-     * @link https://tools.ietf.org/html/rfc3447#section-3.2
-     * @link https://tools.ietf.org/html/draft-ietf-openpgp-rfc4880bis-08#section-5.6.1
-     */
-    return {
-      n: prv.modulus.toArrayLike(Uint8Array),
-      e: prv.publicExponent.toArrayLike(Uint8Array),
-      d: prv.privateExponent.toArrayLike(Uint8Array),
-      // switch p and q
-      p: prv.prime2.toArrayLike(Uint8Array),
-      q: prv.prime1.toArrayLike(Uint8Array),
-      // Since p and q are switched in places, we can keep u as defined by DER
-      u: prv.coefficient.toArrayLike(Uint8Array)
     };
   }
 
@@ -329,39 +265,6 @@ async function webSign(hashName, data, n, e, d, p, q, u) {
   return new Uint8Array(await webCrypto.sign({ 'name': 'RSASSA-PKCS1-v1_5', 'hash': hashName }, key, data));
 }
 
-async function nodeSign(hashAlgo, data, n, e, d, p, q, u) {
-  const { default: BN } = await import('bn.js');
-  const pBNum = new BN(p);
-  const qBNum = new BN(q);
-  const dBNum = new BN(d);
-  const dq = dBNum.mod(qBNum.subn(1)); // d mod (q-1)
-  const dp = dBNum.mod(pBNum.subn(1)); // d mod (p-1)
-  const sign = nodeCrypto.createSign(enums.read(enums.hash, hashAlgo));
-  sign.write(data);
-  sign.end();
-  const keyObject = {
-    version: 0,
-    modulus: new BN(n),
-    publicExponent: new BN(e),
-    privateExponent: new BN(d),
-    // switch p and q
-    prime1: new BN(q),
-    prime2: new BN(p),
-    // switch dp and dq
-    exponent1: dq,
-    exponent2: dp,
-    coefficient: new BN(u)
-  };
-  if (typeof nodeCrypto.createPrivateKey !== 'undefined') { //from version 11.6.0 Node supports der encoded key objects
-    const der = RSAPrivateKey.encode(keyObject, 'der');
-    return new Uint8Array(sign.sign({ key: der, format: 'der', type: 'pkcs1' }));
-  }
-  const pem = RSAPrivateKey.encode(keyObject, 'pem', {
-    label: 'RSA PRIVATE KEY'
-  });
-  return new Uint8Array(sign.sign(pem));
-}
-
 async function bnVerify(hashAlgo, s, n, e, hashed) {
   const BigInteger = await util.getBigInteger();
   n = new BigInteger(n);
@@ -385,52 +288,6 @@ async function webVerify(hashName, data, s, n, e) {
   return webCrypto.verify({ 'name': 'RSASSA-PKCS1-v1_5', 'hash': hashName }, key, s, data);
 }
 
-async function nodeVerify(hashAlgo, data, s, n, e) {
-  const { default: BN } = await import('bn.js');
-
-  const verify = nodeCrypto.createVerify(enums.read(enums.hash, hashAlgo));
-  verify.write(data);
-  verify.end();
-  const keyObject = {
-    modulus: new BN(n),
-    publicExponent: new BN(e)
-  };
-  let key;
-  if (typeof nodeCrypto.createPrivateKey !== 'undefined') { //from version 11.6.0 Node supports der encoded key objects
-    const der = RSAPublicKey.encode(keyObject, 'der');
-    key = { key: der, format: 'der', type: 'pkcs1' };
-  } else {
-    key = RSAPublicKey.encode(keyObject, 'pem', {
-      label: 'RSA PUBLIC KEY'
-    });
-  }
-  try {
-    return await verify.verify(key, s);
-  } catch (err) {
-    return false;
-  }
-}
-
-async function nodeEncrypt(data, n, e) {
-  const { default: BN } = await import('bn.js');
-
-  const keyObject = {
-    modulus: new BN(n),
-    publicExponent: new BN(e)
-  };
-  let key;
-  if (typeof nodeCrypto.createPrivateKey !== 'undefined') {
-    const der = RSAPublicKey.encode(keyObject, 'der');
-    key = { key: der, format: 'der', type: 'pkcs1', padding: nodeCrypto.constants.RSA_PKCS1_PADDING };
-  } else {
-    const pem = RSAPublicKey.encode(keyObject, 'pem', {
-      label: 'RSA PUBLIC KEY'
-    });
-    key = { key: pem, padding: nodeCrypto.constants.RSA_PKCS1_PADDING };
-  }
-  return new Uint8Array(nodeCrypto.publicEncrypt(key, data));
-}
-
 async function bnEncrypt(data, n, e) {
   const BigInteger = await util.getBigInteger();
   n = new BigInteger(n);
@@ -440,47 +297,6 @@ async function bnEncrypt(data, n, e) {
     throw new Error('Message size cannot exceed modulus size');
   }
   return data.modExp(e, n).toUint8Array('be', n.byteLength());
-}
-
-async function nodeDecrypt(data, n, e, d, p, q, u, randomPayload) {
-  const { default: BN } = await import('bn.js');
-
-  const pBNum = new BN(p);
-  const qBNum = new BN(q);
-  const dBNum = new BN(d);
-  const dq = dBNum.mod(qBNum.subn(1)); // d mod (q-1)
-  const dp = dBNum.mod(pBNum.subn(1)); // d mod (p-1)
-  const keyObject = {
-    version: 0,
-    modulus: new BN(n),
-    publicExponent: new BN(e),
-    privateExponent: new BN(d),
-    // switch p and q
-    prime1: new BN(q),
-    prime2: new BN(p),
-    // switch dp and dq
-    exponent1: dq,
-    exponent2: dp,
-    coefficient: new BN(u)
-  };
-  let key;
-  if (typeof nodeCrypto.createPrivateKey !== 'undefined') {
-    const der = RSAPrivateKey.encode(keyObject, 'der');
-    key = { key: der, format: 'der' , type: 'pkcs1', padding: nodeCrypto.constants.RSA_PKCS1_PADDING };
-  } else {
-    const pem = RSAPrivateKey.encode(keyObject, 'pem', {
-      label: 'RSA PRIVATE KEY'
-    });
-    key = { key: pem, padding: nodeCrypto.constants.RSA_PKCS1_PADDING };
-  }
-  try {
-    return new Uint8Array(nodeCrypto.privateDecrypt(key, data));
-  } catch (err) {
-    if (randomPayload) {
-      return randomPayload;
-    }
-    throw new Error('Decryption error');
-  }
 }
 
 async function bnDecrypt(data, n, e, d, p, q, u, randomPayload) {

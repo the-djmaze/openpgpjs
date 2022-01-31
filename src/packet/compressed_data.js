@@ -146,26 +146,8 @@ export default CompressedDataPacket;
 //////////////////////////
 
 
-const nodeZlib = util.getNodeZlib();
-
 function uncompressed(data) {
   return data;
-}
-
-function node_zlib(func, create, options = {}) {
-  return function (data) {
-    if (!util.isStream(data) || stream.isArrayStream(data)) {
-      return stream.fromAsync(() => stream.readToEnd(data).then(data => {
-        return new Promise((resolve, reject) => {
-          func(data, options, (err, result) => {
-            if (err) return reject(err);
-            resolve(result);
-          });
-        });
-      }));
-    }
-    return stream.nodeToWeb(stream.webToNode(data).pipe(create(options)));
-  };
 }
 
 function pako_zlib(constructor, options = {}) {
@@ -191,20 +173,12 @@ function bzip2(func) {
   };
 }
 
-const compress_fns = nodeZlib ? {
-  zip: /*#__PURE__*/ (compressed, level) => node_zlib(nodeZlib.deflateRaw, nodeZlib.createDeflateRaw, { level })(compressed),
-  zlib: /*#__PURE__*/ (compressed, level) => node_zlib(nodeZlib.deflate, nodeZlib.createDeflate, { level })(compressed)
-} : {
+const compress_fns = {
   zip: /*#__PURE__*/ (compressed, level) => pako_zlib(Deflate, { raw: true, level })(compressed),
   zlib: /*#__PURE__*/ (compressed, level) => pako_zlib(Deflate, { level })(compressed)
 };
 
-const decompress_fns = nodeZlib ? {
-  uncompressed: uncompressed,
-  zip: /*#__PURE__*/ node_zlib(nodeZlib.inflateRaw, nodeZlib.createInflateRaw),
-  zlib: /*#__PURE__*/ node_zlib(nodeZlib.inflate, nodeZlib.createInflate),
-  bzip2: /*#__PURE__*/ bzip2(BunzipDecode)
-} : {
+const decompress_fns = {
   uncompressed: uncompressed,
   zip: /*#__PURE__*/ pako_zlib(Inflate, { raw: true }),
   zlib: /*#__PURE__*/ pako_zlib(Inflate),

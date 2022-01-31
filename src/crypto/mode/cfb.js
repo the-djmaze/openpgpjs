@@ -30,19 +30,6 @@ import util from '../../util';
 import enums from '../../enums';
 
 const webCrypto = util.getWebCrypto();
-const nodeCrypto = util.getNodeCrypto();
-
-const knownAlgos = nodeCrypto ? nodeCrypto.getCiphers() : [];
-const nodeAlgos = {
-  idea: knownAlgos.includes('idea-cfb') ? 'idea-cfb' : undefined, /* Unused, not implemented */
-  tripledes: knownAlgos.includes('des-ede3-cfb') ? 'des-ede3-cfb' : undefined,
-  cast5: knownAlgos.includes('cast5-cfb') ? 'cast5-cfb' : undefined,
-  blowfish: knownAlgos.includes('bf-cfb') ? 'bf-cfb' : undefined,
-  aes128: knownAlgos.includes('aes-128-cfb') ? 'aes-128-cfb' : undefined,
-  aes192: knownAlgos.includes('aes-192-cfb') ? 'aes-192-cfb' : undefined,
-  aes256: knownAlgos.includes('aes-256-cfb') ? 'aes-256-cfb' : undefined
-  /* twofish is not implemented in OpenSSL */
-};
 
 /**
  * CFB encryption
@@ -55,9 +42,6 @@ const nodeAlgos = {
  */
 export async function encrypt(algo, key, plaintext, iv, config) {
   const algoName = enums.read(enums.symmetric, algo);
-  if (util.getNodeCrypto() && nodeAlgos[algoName]) { // Node crypto library.
-    return nodeEncrypt(algo, key, plaintext, iv);
-  }
   if (algoName.substr(0, 3) === 'aes') {
     return aesEncrypt(algo, key, plaintext, iv, config);
   }
@@ -97,9 +81,6 @@ export async function encrypt(algo, key, plaintext, iv, config) {
  */
 export async function decrypt(algo, key, ciphertext, iv) {
   const algoName = enums.read(enums.symmetric, algo);
-  if (util.getNodeCrypto() && nodeAlgos[algoName]) { // Node crypto library.
-    return nodeDecrypt(algo, key, ciphertext, iv);
-  }
   if (algoName.substr(0, 3) === 'aes') {
     return aesDecrypt(algo, key, ciphertext, iv);
   }
@@ -165,16 +146,4 @@ async function webEncrypt(algo, key, pt, iv) {
   const ct = new Uint8Array(await webCrypto.encrypt({ name: ALGO, iv }, _key, cbc_pt)).subarray(0, pt.length);
   xorMut(ct, pt);
   return ct;
-}
-
-function nodeEncrypt(algo, key, pt, iv) {
-  const algoName = enums.read(enums.symmetric, algo);
-  const cipherObj = new nodeCrypto.createCipheriv(nodeAlgos[algoName], key, iv);
-  return stream.transform(pt, value => new Uint8Array(cipherObj.update(value)));
-}
-
-function nodeDecrypt(algo, key, ct, iv) {
-  const algoName = enums.read(enums.symmetric, algo);
-  const decipherObj = new nodeCrypto.createDecipheriv(nodeAlgos[algoName], key, iv);
-  return stream.transform(ct, value => new Uint8Array(decipherObj.update(value)));
 }

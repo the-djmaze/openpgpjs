@@ -9,7 +9,6 @@ import { AES_CBC } from '@openpgp/asmcrypto.js/dist_es8/aes/cbc';
 import util from '../util';
 
 const webCrypto = util.getWebCrypto();
-const nodeCrypto = util.getNodeCrypto();
 
 
 /**
@@ -78,13 +77,6 @@ async function CBC(key) {
     return async function(pt) {
       const ct = await webCrypto.encrypt({ name: 'AES-CBC', iv: zeroBlock, length: blockLength * 8 }, key, pt);
       return new Uint8Array(ct).subarray(0, ct.byteLength - blockLength);
-    };
-  }
-  if (util.getNodeCrypto()) { // Node crypto library
-    return async function(pt) {
-      const en = new nodeCrypto.createCipheriv('aes-' + (key.length * 8) + '-cbc', key, zeroBlock);
-      const ct = en.update(pt);
-      return new Uint8Array(ct);
     };
   }
   // asm.js fallback

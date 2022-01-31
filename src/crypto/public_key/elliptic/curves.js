@@ -30,25 +30,12 @@ import OID from '../../../type/oid';
 import { keyFromPublic, keyFromPrivate, getIndutnyCurve } from './indutnyKey';
 
 const webCrypto = util.getWebCrypto();
-const nodeCrypto = util.getNodeCrypto();
 
 const webCurves = {
   'p256': 'P-256',
   'p384': 'P-384',
   'p521': 'P-521'
 };
-const knownCurves = nodeCrypto ? nodeCrypto.getCurves() : [];
-const nodeCurves = nodeCrypto ? {
-  secp256k1: knownCurves.includes('secp256k1') ? 'secp256k1' : undefined,
-  p256: knownCurves.includes('prime256v1') ? 'prime256v1' : undefined,
-  p384: knownCurves.includes('secp384r1') ? 'secp384r1' : undefined,
-  p521: knownCurves.includes('secp521r1') ? 'secp521r1' : undefined,
-  ed25519: knownCurves.includes('ED25519') ? 'ED25519' : undefined,
-  curve25519: knownCurves.includes('X25519') ? 'X25519' : undefined,
-  brainpoolP256r1: knownCurves.includes('brainpoolP256r1') ? 'brainpoolP256r1' : undefined,
-  brainpoolP384r1: knownCurves.includes('brainpoolP384r1') ? 'brainpoolP384r1' : undefined,
-  brainpoolP512r1: knownCurves.includes('brainpoolP512r1') ? 'brainpoolP512r1' : undefined
-} : {};
 
 const curves = {
   p256: {
@@ -56,7 +43,6 @@ const curves = {
     keyType: enums.publicKey.ecdsa,
     hash: enums.hash.sha256,
     cipher: enums.symmetric.aes128,
-    node: nodeCurves.p256,
     web: webCurves.p256,
     payloadSize: 32,
     sharedSize: 256
@@ -66,7 +52,6 @@ const curves = {
     keyType: enums.publicKey.ecdsa,
     hash: enums.hash.sha384,
     cipher: enums.symmetric.aes192,
-    node: nodeCurves.p384,
     web: webCurves.p384,
     payloadSize: 48,
     sharedSize: 384
@@ -76,7 +61,6 @@ const curves = {
     keyType: enums.publicKey.ecdsa,
     hash: enums.hash.sha512,
     cipher: enums.symmetric.aes256,
-    node: nodeCurves.p521,
     web: webCurves.p521,
     payloadSize: 66,
     sharedSize: 528
@@ -86,14 +70,12 @@ const curves = {
     keyType: enums.publicKey.ecdsa,
     hash: enums.hash.sha256,
     cipher: enums.symmetric.aes128,
-    node: nodeCurves.secp256k1,
     payloadSize: 32
   },
   ed25519: {
     oid: [0x06, 0x09, 0x2B, 0x06, 0x01, 0x04, 0x01, 0xDA, 0x47, 0x0F, 0x01],
     keyType: enums.publicKey.eddsa,
     hash: enums.hash.sha512,
-    node: false, // nodeCurves.ed25519 TODO
     payloadSize: 32
   },
   curve25519: {
@@ -101,7 +83,6 @@ const curves = {
     keyType: enums.publicKey.ecdh,
     hash: enums.hash.sha256,
     cipher: enums.symmetric.aes128,
-    node: false, // nodeCurves.curve25519 TODO
     payloadSize: 32
   },
   brainpoolP256r1: {
@@ -109,7 +90,6 @@ const curves = {
     keyType: enums.publicKey.ecdsa,
     hash: enums.hash.sha256,
     cipher: enums.symmetric.aes128,
-    node: nodeCurves.brainpoolP256r1,
     payloadSize: 32
   },
   brainpoolP384r1: {
@@ -117,7 +97,6 @@ const curves = {
     keyType: enums.publicKey.ecdsa,
     hash: enums.hash.sha384,
     cipher: enums.symmetric.aes192,
-    node: nodeCurves.brainpoolP384r1,
     payloadSize: 48
   },
   brainpoolP512r1: {
@@ -125,7 +104,6 @@ const curves = {
     keyType: enums.publicKey.ecdsa,
     hash: enums.hash.sha512,
     cipher: enums.symmetric.aes256,
-    node: nodeCurves.brainpoolP512r1,
     payloadSize: 64
   }
 };
@@ -154,13 +132,10 @@ class Curve {
     this.oid = params.oid;
     this.hash = params.hash;
     this.cipher = params.cipher;
-    this.node = params.node && curves[this.name];
     this.web = params.web && curves[this.name];
     this.payloadSize = params.payloadSize;
     if (this.web && util.getWebCrypto()) {
       this.type = 'web';
-    } else if (this.node && util.getNodeCrypto()) {
-      this.type = 'node';
     } else if (this.name === 'curve25519') {
       this.type = 'curve25519';
     } else if (this.name === 'ed25519') {
@@ -178,8 +153,6 @@ class Curve {
           util.printDebugError('Browser did not support generating ec key ' + err.message);
           break;
         }
-      case 'node':
-        return nodeGenKeyPair(this.name);
       case 'curve25519': {
         const privateKey = await getRandomBytes(32);
         privateKey[0] = (privateKey[0] & 127) | 64;
@@ -292,7 +265,7 @@ async function validateStandardParams(algo, oid, Q, d) {
 }
 
 export {
-  Curve, curves, webCurves, nodeCurves, generate, getPreferredHashAlgo, jwkToRawPublic, rawPublicToJWK, privateToJWK, validateStandardParams
+  Curve, curves, webCurves, generate, getPreferredHashAlgo, jwkToRawPublic, rawPublicToJWK, privateToJWK, validateStandardParams
 };
 
 //////////////////////////
@@ -312,16 +285,6 @@ async function webGenKeyPair(name) {
   return {
     publicKey: jwkToRawPublic(publicKey),
     privateKey: b64ToUint8Array(privateKey.d, true)
-  };
-}
-
-async function nodeGenKeyPair(name) {
-  // Note: ECDSA and ECDH key generation is structurally equivalent
-  const ecdh = nodeCrypto.createECDH(nodeCurves[name]);
-  await ecdh.generateKeys();
-  return {
-    publicKey: new Uint8Array(ecdh.getPublicKey()),
-    privateKey: new Uint8Array(ecdh.getPrivateKey())
   };
 }
 
