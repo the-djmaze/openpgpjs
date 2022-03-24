@@ -65,7 +65,7 @@ const allowedKeyPackets = /*#__PURE__*/ util.constructAllowedPackets([
 export async function generate(options, config) {
   options.sign = true; // primary key is always a signing key
   options = helper.sanitizeKeyOptions(options);
-  options.subkeys = options.subkeys.map((subkey, index) => helper.sanitizeKeyOptions(options.subkeys[index], options));
+  options.subkeys = options.subkeys.map((subkey, index) => helper.sanitizeKeyOptions(subkey, options));
   let promises = [helper.generateSecretKey(options, config)];
   promises = promises.concat(options.subkeys.map(options => helper.generateSecretSubkey(options, config)));
   const packets = await Promise.all(promises);
