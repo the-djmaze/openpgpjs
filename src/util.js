@@ -27,7 +27,7 @@ import * as stream from '@openpgp/web-stream-tools';
 import { getBigInteger } from './biginteger';
 
 const util = {
-  isString: data => typeof data === 'string' || Object.prototype.isPrototypeOf.call(data, String),
+  isString: data => null != data && (typeof data === 'string' || Object.prototype.isPrototypeOf.call(data, String)),
 
   isArray: data => Array.isArray(data),
 
