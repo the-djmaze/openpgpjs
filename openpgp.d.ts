@@ -1,11 +1,13 @@
 /**
  * Type definitions for OpenPGP.js http://openpgpjs.org/
- * 
+ *
  * Contributors:
  *  - FlowCrypt a. s. <https://flowcrypt.com>
  *  - Guillaume Lacasa <https://blog.lacasa.fr>
  *  - Errietta Kostala <https://github.com/errietta>
  */
+
+import type { WebStream as GenericWebStream, NodeStream as GenericNodeStream } from '@openpgp/web-stream-tools';
 
 /* ############## v5 KEY #################### */
 // The Key and PublicKey types can be used interchangably since TS cannot detect the difference, as they have the same class properties.
@@ -18,9 +20,9 @@ export function readPrivateKey(options: { armoredKey: string, config?: PartialCo
 export function readPrivateKey(options: { binaryKey: Uint8Array, config?: PartialConfig }): Promise<PrivateKey>;
 export function readPrivateKeys(options: { armoredKeys: string, config?: PartialConfig }): Promise<PrivateKey[]>;
 export function readPrivateKeys(options: { binaryKeys: Uint8Array, config?: PartialConfig }): Promise<PrivateKey[]>;
-export function generateKey(options: KeyOptions & { format?: 'armored' }): Promise<SerializedKeyPair<string> & { revocationCertificate: string }>;
-export function generateKey(options: KeyOptions & { format: 'binary' }): Promise<SerializedKeyPair<Uint8Array> & { revocationCertificate: string }>;
-export function generateKey(options: KeyOptions & { format: 'object' }): Promise<KeyPair & { revocationCertificate: string }>;
+export function generateKey(options: GenerateKeyOptions & { format?: 'armored' }): Promise<SerializedKeyPair<string> & { revocationCertificate: string }>;
+export function generateKey(options: GenerateKeyOptions & { format: 'binary' }): Promise<SerializedKeyPair<Uint8Array> & { revocationCertificate: string }>;
+export function generateKey(options: GenerateKeyOptions & { format: 'object' }): Promise<KeyPair & { revocationCertificate: string }>;
 export function decryptKey(options: { privateKey: PrivateKey; passphrase?: MaybeArray<string>; config?: PartialConfig }): Promise<PrivateKey>;
 export function encryptKey(options: { privateKey: PrivateKey; passphrase?: MaybeArray<string>; config?: PartialConfig }): Promise<PrivateKey>;
 export function reformatKey(options: { privateKey: PrivateKey; userIDs?: MaybeArray<UserID>; passphrase?: string; keyExpirationTime?: number; date?: Date, format?: 'armored', config?: PartialConfig }): Promise<SerializedKeyPair<string> & { revocationCertificate: string }>;
@@ -57,7 +59,7 @@ export abstract class Key {
   public verifyPrimaryKey(date?: Date, userID?: UserID, config?: Config): Promise<void>; // throws on error
   public verifyPrimaryUser(publicKeys: PublicKey[], date?: Date, userIDs?: UserID, config?: Config): Promise<{ keyID: KeyID, valid: boolean | null }[]>;
   public verifyAllUsers(publicKeys: PublicKey[], date?: Date, config?: Config): Promise<{ userID: string, keyID: KeyID, valid: boolean | null }[]>;
-  public isRevoked(signature: SignaturePacket, key?: AnyKeyPacket, date?: Date, config?: Config): Promise<boolean>;
+  public isRevoked(signature?: SignaturePacket, key?: AnyKeyPacket, date?: Date, config?: Config): Promise<boolean>;
   public getRevocationCertificate(date?: Date, config?: Config): Promise<MaybeStream<string> | undefined>;
   public getEncryptionKey(keyID?: KeyID, date?: Date | null, userID?: UserID, config?: Config): Promise<this | Subkey>;
   public getSigningKey(keyID?: KeyID, date?: Date | null, userID?: UserID, config?: Config): Promise<this | Subkey>;
@@ -171,15 +173,9 @@ export class CleartextMessage {
 
 /* ############## v5 MSG #################### */
 export function generateSessionKey(options: { encryptionKeys: MaybeArray<PublicKey>, date?: Date, encryptionUserIDs?: MaybeArray<UserID>, config?: PartialConfig }): Promise<SessionKey>;
-export function encryptSessionKey(options: SessionKey & { 
-  encryptionKeys?: MaybeArray<PublicKey>, passwords?: MaybeArray<string>, format?: 'armored', wildcard?: boolean, encryptionKeyIDs?: MaybeArray<KeyID>, date?: Date, encryptionUserIDs?: MaybeArray<UserID>, config?: PartialConfig
-}) : Promise<string>;
-export function encryptSessionKey(options: SessionKey & { 
-  encryptionKeys?: MaybeArray<PublicKey>, passwords?: MaybeArray<string>, format: 'binary', wildcard?: boolean, encryptionKeyIDs?: MaybeArray<KeyID>, date?: Date, encryptionUserIDs?: MaybeArray<UserID>, config?: PartialConfig
-}) : Promise<Uint8Array>;
-export function encryptSessionKey(options: SessionKey & { 
-  encryptionKeys?: MaybeArray<PublicKey>, passwords?: MaybeArray<string>, format: 'object', wildcard?: boolean, encryptionKeyIDs?: MaybeArray<KeyID>, date?: Date, encryptionUserIDs?: MaybeArray<UserID>, config?: PartialConfig
-}) : Promise<Message<Data>>;
+export function encryptSessionKey(options: EncryptSessionKeyOptions & { format?: 'armored' }): Promise<string>;
+export function encryptSessionKey(options: EncryptSessionKeyOptions & { format: 'binary' }): Promise<Uint8Array>;
+export function encryptSessionKey(options: EncryptSessionKeyOptions & { format: 'object' }): Promise<Message<Data>>;
 export function decryptSessionKeys<T extends MaybeStream<Data>>(options: { message: Message<T>, decryptionKeys?: MaybeArray<PrivateKey>, passwords?: MaybeArray<string>, date?: Date, config?: PartialConfig }): Promise<SessionKey[]>;
 
 export function readMessage<T extends MaybeStream<string>>(options: { armoredMessage: T, config?: PartialConfig }): Promise<Message<T>>;
@@ -271,7 +267,7 @@ export class Message<T extends MaybeStream<Data>> {
 
   /** Get literal data that is the body of the message
    */
-  public getLiteralData(): MaybeStream<Uint8Array> | null;
+  public getLiteralData(): (T extends Stream<Data> ? WebStream<Uint8Array> : Uint8Array) | null;
 
   /** Returns the key IDs of the keys that signed the message
    */
@@ -279,7 +275,7 @@ export class Message<T extends MaybeStream<Data>> {
 
   /** Get literal data as text
    */
-  public getText(): MaybeStream<string> | null;
+  public getText(): (T extends Stream<Data> ? WebStream<string> : string) | null;
 
   public getFilename(): string | null;
 
@@ -520,10 +516,9 @@ export class SignaturePacket extends BasePacket {
   public issuerKeyVersion: null | number;
   public issuerFingerprint: null | Uint8Array;
   public preferredAEADAlgorithms: enums.aead[] | null;
-  public verified: null | boolean;
   public revoked: null | boolean;
   public sign(key: AnySecretKeyPacket, data: Uint8Array, date?: Date, detached?: boolean): Promise<void>;
-  public verify(key: AnyKeyPacket, signatureType: enums.signature, data: Uint8Array, date?: Date, detached?: boolean, config?: Config): Promise<void>; // throws on error
+  public verify(key: AnyKeyPacket, signatureType: enums.signature, data: Uint8Array | object, date?: Date, detached?: boolean, config?: Config): Promise<void>; // throws on error
   public isExpired(date?: Date): boolean;
   public getExpirationTime(): Date | typeof Infinity;
 }
@@ -549,18 +544,10 @@ export class PacketList<T extends AnyPacket> extends Array<T> {
 /* ############## v5 STREAM #################### */
 
 type Data = Uint8Array | string;
-interface BaseStream<T extends Data> extends AsyncIterable<T> { }
-interface WebStream<T extends Data> extends BaseStream<T> { // copied+simplified version of ReadableStream from lib.dom.d.ts
-  readonly locked: boolean; getReader: Function; pipeThrough: Function; pipeTo: Function; tee: Function;
-  cancel(reason?: any): Promise<void>;
-}
-interface NodeStream<T extends Data> extends BaseStream<T> { // copied+simplified version of ReadableStream from @types/node/index.d.ts
-  readable: boolean; pipe: Function; unpipe: Function; wrap: Function;
-  read(size?: number): string | Uint8Array; setEncoding(encoding: string): this; pause(): this; resume(): this;
-  isPaused(): boolean; unshift(chunk: string | Uint8Array): void;
-}
-type Stream<T extends Data> = WebStream<T> | NodeStream<T>;
-type MaybeStream<T extends Data> = T | Stream<T>;
+export interface WebStream<T extends Data> extends GenericWebStream<T> {}
+export interface NodeStream<T extends Data> extends GenericNodeStream<T> {}
+export type Stream<T extends Data> = WebStream<T> | NodeStream<T>;
+export type MaybeStream<T extends Data> = T | Stream<T>;
 
 /* ############## v5 GENERAL #################### */
 type MaybeArray<T> = T | Array<T>;
@@ -628,7 +615,7 @@ interface DecryptOptions {
 
 interface SignOptions {
   message: CleartextMessage | Message<MaybeStream<Data>>;
-  signingKeys?: MaybeArray<PrivateKey>;
+  signingKeys: MaybeArray<PrivateKey>;
   format?: 'armored' | 'binary' | 'object';
   detached?: boolean;
   signingKeyIDs?: MaybeArray<KeyID>;
@@ -653,6 +640,16 @@ interface VerifyOptions {
   config?: PartialConfig;
 }
 
+interface EncryptSessionKeyOptions extends SessionKey {
+  encryptionKeys?: MaybeArray<PublicKey>,
+  passwords?: MaybeArray<string>,
+  format?: 'armored' | 'binary' | 'object',
+  date?: Date,
+  wildcard?: boolean,
+  encryptionKeyIDs?: MaybeArray<KeyID>,
+  encryptionUserIDs?: MaybeArray<UserID>,
+  config?: PartialConfig
+}
 
 interface SerializedKeyPair<T extends string|Uint8Array> {
   privateKey: T;
@@ -665,7 +662,7 @@ interface KeyPair {
 
 export type EllipticCurveName = 'ed25519' | 'curve25519' | 'p256' | 'p384' | 'p521' | 'secp256k1' | 'brainpoolP256r1' | 'brainpoolP384r1' | 'brainpoolP512r1';
 
-interface KeyOptions {
+interface GenerateKeyOptions {
   userIDs: MaybeArray<UserID>;
   passphrase?: string;
   type?: 'ecc' | 'rsa';
@@ -677,6 +674,7 @@ interface KeyOptions {
   format?: 'armored' | 'object' | 'binary';
   config?: PartialConfig;
 }
+export type KeyOptions = GenerateKeyOptions;
 
 interface SubkeyOptions {
   type?: 'ecc' | 'rsa';
