@@ -52,21 +52,12 @@ const util = {
     return b;
   },
 
-  readDate(bytes) {
-    const n = util.readNumber(bytes);
-    const d = new Date(n * 1000);
-    return d;
-  },
+  readDate: bytes => new Date(util.readNumber(bytes) * 1000),
 
-  writeDate(time) {
-    const numeric = Math.floor(time.getTime() / 1000);
+  writeDate: time => util.writeNumber(Math.floor(time.getTime() / 1000), 4),
 
-    return util.writeNumber(numeric, 4);
-  },
-
-  normalizeDate(time = Date.now()) {
-    return time === null || time === Infinity ? time : new Date(Math.floor(+time / 1000) * 1000);
-  },
+  normalizeDate: (time = Date.now()) =>
+    time === null || time === Infinity ? time : new Date(Math.floor(+time / 1000) * 1000),
 
   /**
    * Read one MPI from bytes in input
@@ -87,8 +78,7 @@ const util = {
    */
   leftPad(bytes, length) {
     const padded = new Uint8Array(length);
-    const offset = length - bytes.length;
-    padded.set(bytes, offset);
+    padded.set(bytes, length - bytes.length);
     return padded;
   },
 
@@ -160,8 +150,8 @@ const util = {
    * @param {String} str - String to convert
    * @returns {Uint8Array} An array of 8-bit integers.
    */
-  stringToUint8Array(str) {
-    return stream.transform(str, str => {
+  stringToUint8Array: str =>
+    stream.transform(str, str => {
       if (!util.isString(str)) {
         throw new Error('stringToUint8Array: Data must be in the form of a string');
       }
@@ -171,8 +161,7 @@ const util = {
         result[i] = str.charCodeAt(i);
       }
       return result;
-    });
-  },
+    }),
 
   /**
    * Convert an array of 8-bit integers to a string
@@ -344,9 +333,7 @@ const util = {
    * Get native Web Cryptography api, only the current version of the spec.
    * @returns {Object} The SubtleCrypto api or 'undefined'.
    */
-  getWebCrypto() {
-    return crypto.subtle;
-  },
+  getWebCrypto: () => crypto.subtle,
 
   /**
    * Detect native BigInt support
@@ -362,9 +349,7 @@ const util = {
    */
   getBigInteger,
 
-  getHardwareConcurrency() {
-    return navigator.hardwareConcurrency || 1;
-  },
+  getHardwareConcurrency: () => navigator.hardwareConcurrency || 1,
 
   isEmailAddress(data) {
     if (!util.isString(data)) {
@@ -548,9 +533,7 @@ const util = {
    * @param {Uint8} b
    * @returns `a` if `cond` is true, `b` otherwise
    */
-  selectUint8(cond, a, b) {
-    return (a & (256 - cond)) | (b & (255 + cond));
-  }
+  selectUint8: (cond, a, b) => (a & (256 - cond)) | (b & (255 + cond))
 };
 
 export default util;
