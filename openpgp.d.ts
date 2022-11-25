@@ -74,11 +74,11 @@ export abstract class Key {
 
 type AllowedKeyPackets = PublicKeyPacket | PublicSubkeyPacket | SecretKeyPacket | SecretSubkeyPacket | UserIDPacket | UserAttributePacket | SignaturePacket;
 export class PublicKey extends Key {
-  constructor(packetlist: PacketList<AnyKeyPacket>);
+  constructor(packetlist: PacketList<AnyPacket>);
 }
 
 export class PrivateKey extends PublicKey {
-  constructor(packetlist: PacketList<AnyKeyPacket>);
+  constructor(packetlist: PacketList<AnyPacket>);
   public revoke(reason?: ReasonForRevocation, date?: Date, config?: Config): Promise<PrivateKey>;
   public isDecrypted(): boolean;
   public addSubkey(options: SubkeyOptions): Promise<PrivateKey>;
@@ -322,6 +322,7 @@ interface Config {
   versionString: string;
   commentString: string;
   allowInsecureDecryptionWithSigningKeys: boolean;
+  allowInsecureVerificationWithReformattedKeys: boolean;
   constantTimePKCS1Decryption: boolean;
   constantTimePKCS1DecryptionSupportedSymmetricAlgorithms: Set<enums.symmetric>;
   v5Keys: boolean;
@@ -517,17 +518,29 @@ export class SignaturePacket extends BasePacket {
   public issuerFingerprint: null | Uint8Array;
   public preferredAEADAlgorithms: enums.aead[] | null;
   public revoked: null | boolean;
+  public rawNotations: RawNotation[];
   public sign(key: AnySecretKeyPacket, data: Uint8Array, date?: Date, detached?: boolean): Promise<void>;
   public verify(key: AnyKeyPacket, signatureType: enums.signature, data: Uint8Array | object, date?: Date, detached?: boolean, config?: Config): Promise<void>; // throws on error
   public isExpired(date?: Date): boolean;
   public getExpirationTime(): Date | typeof Infinity;
 }
 
+export interface RawNotation {
+  name: string;
+  value: Uint8Array;
+  humanReadable: boolean;
+}
+
 export class TrustPacket extends BasePacket {
   static readonly tag: enums.packet.trust;
 }
 
-export type AnyPacket = BasePacket;
+export class UnparseablePacket {
+  tag: enums.packet;
+  write: () => Uint8Array;
+}
+
+export type AnyPacket = BasePacket | UnparseablePacket;
 export type AnySecretKeyPacket = SecretKeyPacket | SecretSubkeyPacket;
 export type AnyKeyPacket = BasePublicKeyPacket;
 
@@ -708,7 +721,7 @@ interface VerifyMessageResult {
 /**
  * Armor an OpenPGP binary packet block
  */
-export function armor(messagetype: enums.armor, body: object, partindex: number, parttotal: number, config?: Config): string;
+export function armor(messagetype: enums.armor, body: object, partindex?: number, parttotal?: number, config?: Config): string;
 
 /**
  * DeArmor an OpenPGP armored message; verify the checksum and return the encoded bytes

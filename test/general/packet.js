@@ -969,7 +969,8 @@ kePFjAnu9cpynKXu3usf8+FuBw2zLsg1Id1n7ttxoAte416KjBN9lFBt8mcu
       packets.push(signaturePacket);
       const bytes = packets.write();
       const parsed = await openpgp.PacketList.fromBinary(bytes, allAllowedPackets, { ...openpgp.config, ignoreUnsupportedPackets: true });
-      expect(parsed.length).to.equal(0);
+      expect(parsed.length).to.equal(1);
+      expect(parsed[0].tag).to.equal(openpgp.enums.packet.signature);
     });
 
     it('Throws on unknown packet version with `config.ignoreUnsupportedPackets` disabled', async function() {
@@ -995,6 +996,46 @@ kePFjAnu9cpynKXu3usf8+FuBw2zLsg1Id1n7ttxoAte416KjBN9lFBt8mcu
       ).to.be.rejectedWith(/Version 1 of the signature packet is unsupported/);
     });
 
+    it('Ignores unknown signature algorithm only with `config.ignoreUnsupportedPackets` enabled', async function() {
+      const binarySignature = util.hexToUint8Array('c2750401630a00060502628b8e2200210910f30ddfc2310b3560162104b9b0045c1930f842cb245566f30ddfc2310b35602ded0100bd69fe6a9f52499cd8b2fd2493dae91c997979890df4467cf31b197901590ff10100ead4c671487535b718a8428c8e6099e3873a41610aad9fcdaa06f6df5f404002');
+
+      const parsed = await openpgp.PacketList.fromBinary(binarySignature, allAllowedPackets, { ...openpgp.config, ignoreUnsupportedPackets: true });
+      expect(parsed.length).to.equal(1);
+      expect(parsed[0]).instanceOf(openpgp.UnparseablePacket);
+      expect(parsed[0].tag).to.equal(openpgp.enums.packet.signature);
+
+      await expect(
+        openpgp.PacketList.fromBinary(binarySignature, allAllowedPackets, { ...openpgp.config, ignoreUnsupportedPackets: false })
+      ).to.be.rejectedWith(/Unknown signature algorithm/);
+    });
+
+    it('Ignores unknown key algorithm only with `config.ignoreUnsupportedPackets` enabled', async function() {
+      const binaryKey = util.hexToUint8Array('c55804628b944e63092b06010401da470f01010740d01ab8619b6dc6a36da5bff62ff416a974900f5a8c74d1bd1760d717d0aad8d50000ff516f8e3190aa5b394597655d7c32e16392e638da0e2a869fb7b1f429d9de263d1062cd0f3c7465737440746573742e636f6d3ec28c0410160a001d0502628b944e040b0907080315080a0416000201021901021b03021e01002109104803e40df201fa5b16210496dc42e91cc585e2f5e331644803e40df201fa5b340b0100812c47b60fa509e12e329fc37cc9c437cc6a6500915caa03ad8703db849846f900ff571b9a0d9e1dcc087d9fae04ec2906e60ef40ca02a387eb07ce1c37bedeecd0a');
+
+      const parsed = await openpgp.PacketList.fromBinary(binaryKey, allAllowedPackets, { ...openpgp.config, ignoreUnsupportedPackets: true });
+      expect(parsed.length).to.equal(3);
+      expect(parsed[0]).instanceOf(openpgp.UnparseablePacket);
+      expect(parsed[0].tag).to.equal(openpgp.enums.packet.secretKey);
+
+      await expect(
+        openpgp.PacketList.fromBinary(binaryKey, allAllowedPackets, { ...openpgp.config, ignoreUnsupportedPackets: false })
+      ).to.be.rejectedWith(/Unknown public key encryption algorithm/);
+    });
+
+    it('Ignores unknown PKESK algorithm only with `config.ignoreUnsupportedPackets` enabled', async function() {
+      const binaryMessage = util.hexToUint8Array('c15e03c6a6737124ef0f5e63010740282956b4db64ea79e1b4b8e5c528241b5e1cf40b2f5df2a619692755d532353d30a8e044e7c96f51741c73e6c5c8f73db08daf66e49240afe90c9b50705d51e71ec2e7630c5bd86b002e1f6dbd638f61e2d23501830d9bb3711c66963363a6e5f8d9294210a0cd194174c3caa3f29865d33c6be4c09b437f906ca8d35e666f3ef53fd22e0d8ceade');
+
+      const parsed = await openpgp.PacketList.fromBinary(binaryMessage, allAllowedPackets, { ...openpgp.config, ignoreUnsupportedPackets: true });
+      expect(parsed.length).to.equal(2);
+      expect(parsed[0]).instanceOf(openpgp.UnparseablePacket);
+      expect(parsed[0].tag).to.equal(openpgp.enums.packet.publicKeyEncryptedSessionKey);
+
+      await expect(
+        openpgp.PacketList.fromBinary(binaryMessage, allAllowedPackets, { ...openpgp.config, ignoreUnsupportedPackets: false })
+      ).to.be.rejectedWith(/Unknown public key encryption algorithm/);
+    });
+
+
     it('Throws on disallowed packet even with tolerant mode enabled', async function() {
       const packets = new openpgp.PacketList();
       packets.push(new openpgp.LiteralDataPacket());
@@ -1011,7 +1052,8 @@ kePFjAnu9cpynKXu3usf8+FuBw2zLsg1Id1n7ttxoAte416KjBN9lFBt8mcu
         openpgp.PacketList.fromBinary(bytes, allAllowedPackets, { ...openpgp.config, maxUserIDLength: 2, ignoreMalformedPackets: false })
       ).to.be.rejectedWith(/User ID string is too long/);
       const parsed = await openpgp.PacketList.fromBinary(bytes, allAllowedPackets, { ...openpgp.config, maxUserIDLength: 2, ignoreMalformedPackets: true });
-      expect(parsed.length).to.equal(0);
+      expect(parsed.length).to.equal(1);
+      expect(parsed[0].tag).to.equal(openpgp.enums.packet.userID);
     });
   });
 });
