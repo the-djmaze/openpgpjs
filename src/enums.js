@@ -43,17 +43,21 @@ export default {
     '2b8104000a':   'secp256k1',
     '2B8104000A':   'secp256k1',
 
-    /** Ed25519 */
+    /** Ed25519 - deprecated by crypto-refresh (replaced by standaone Ed25519 algo) */
+    'ed25519Legacy':          'ed25519',
     'ED25519':                'ed25519',
+    /** @deprecated use `ed25519Legacy` instead */
     'ed25519':                'ed25519',
     'Ed25519':                'ed25519',
     '1.3.6.1.4.1.11591.15.1': 'ed25519',
     '2b06010401da470f01':     'ed25519',
     '2B06010401DA470F01':     'ed25519',
 
-    /** Curve25519 */
+    /** Curve25519 - deprecated by crypto-refresh (replaced by standaone X25519 algo) */
+    'curve25519Legacy':       'curve25519',
     'X25519':                 'curve25519',
     'cv25519':                'curve25519',
+    /** @deprecated use `curve25519Legacy` instead */
     'curve25519':             'curve25519',
     'Curve25519':             'curve25519',
     '1.3.6.1.4.1.3029.1.5.1': 'curve25519',
@@ -90,7 +94,7 @@ export default {
     gnu: 101
   },
 
-  /** {@link https://tools.ietf.org/html/draft-ietf-openpgp-rfc4880bis-04#section-9.1|RFC4880bis-04, section 9.1}
+  /** {@link https://tools.ietf.org/html/draft-ietf-openpgp-crypto-refresh-08.html#section-9.1|crypto-refresh RFC, section 9.1}
    * @enum {Integer}
    * @readonly
    */
@@ -109,13 +113,25 @@ export default {
     ecdh: 18,
     /** ECDSA (Sign only) [RFC6637] */
     ecdsa: 19,
-    /** EdDSA (Sign only)
+    /** EdDSA (Sign only) - deprecated by crypto-refresh (replaced by `ed25519` identifier below)
      * [{@link https://tools.ietf.org/html/draft-koch-eddsa-for-openpgp-04|Draft RFC}] */
+    eddsaLegacy: 22, // NB: this is declared before `eddsa` to translate 22 to 'eddsa' for backwards compatibility
+    /** @deprecated use `eddsaLegacy` instead */
+    ed25519Legacy: 22,
+    /** @deprecated use `eddsaLegacy` instead */
     eddsa: 22,
     /** Reserved for AEDH */
     aedh: 23,
     /** Reserved for AEDSA */
-    aedsa: 24
+    aedsa: 24,
+    /** X25519 (Encrypt only) */
+    x25519: 25,
+    /** X448 (Encrypt only) */
+    x448: 26,
+    /** Ed25519 (Sign only) */
+    ed25519: 27,
+    /** Ed448 (Sign only) */
+    ed448: 28
   },
 
   /** {@link https://tools.ietf.org/html/rfc4880#section-9.2|RFC4880, section 9.2}

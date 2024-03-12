@@ -75,7 +75,7 @@ const curves = {
   },
   ed25519: {
     oid: [0x06, 0x09, 0x2B, 0x06, 0x01, 0x04, 0x01, 0xDA, 0x47, 0x0F, 0x01],
-    keyType: enums.publicKey.eddsa,
+    keyType: enums.publicKey.eddsaLegacy,
     hash: enums.hash.sha512,
     payloadSize: 32
   },
@@ -109,7 +109,7 @@ const curves = {
   }
 };
 
-class Curve {
+class CurveWithOID {
   constructor(oidOrName, params) {
     try {
       if (util.isArray(oidOrName) ||
@@ -155,7 +155,7 @@ class Curve {
           break;
         }
       case 'curve25519': {
-        const privateKey = await getRandomBytes(32);
+        const privateKey = getRandomBytes(32);
         privateKey[0] = (privateKey[0] & 127) | 64;
         privateKey[31] &= 248;
         const secretKey = privateKey.slice().reverse();
@@ -164,7 +164,7 @@ class Curve {
         return { publicKey, privateKey };
       }
       case 'ed25519': {
-        const privateKey = await getRandomBytes(32);
+        const privateKey = getRandomBytes(32);
         const keyPair = nacl.sign.keyPair.fromSeed(privateKey);
         const publicKey = util.concatUint8Array([new Uint8Array([0x40]), keyPair.publicKey]);
         return { publicKey, privateKey };
@@ -172,7 +172,7 @@ class Curve {
     }
     const indutnyCurve = await getIndutnyCurve(this.name);
     keyPair = await indutnyCurve.genKeyPair({
-      entropy: util.uint8ArrayToString(await getRandomBytes(32))
+      entropy: util.uint8ArrayToString(getRandomBytes(32))
     });
     return { publicKey: new Uint8Array(keyPair.getPublic('array', false)), privateKey: keyPair.getPrivate().toArrayLike(Uint8Array) };
   }
@@ -181,7 +181,7 @@ class Curve {
 async function generate(curve) {
   const BigInteger = await util.getBigInteger();
 
-  curve = new Curve(curve);
+  curve = new CurveWithOID(curve);
   const keyPair = await curve.genKeyPair();
   const Q = new BigInteger(keyPair.publicKey).toUint8Array();
   const secret = new BigInteger(keyPair.privateKey).toUint8Array('be', curve.payloadSize);
@@ -266,7 +266,7 @@ async function validateStandardParams(algo, oid, Q, d) {
 }
 
 export {
-  Curve, curves, webCurves, generate, getPreferredHashAlgo, jwkToRawPublic, rawPublicToJWK, privateToJWK, validateStandardParams
+  CurveWithOID, curves, webCurves, generate, getPreferredHashAlgo, jwkToRawPublic, rawPublicToJWK, privateToJWK, validateStandardParams
 };
 
 //////////////////////////

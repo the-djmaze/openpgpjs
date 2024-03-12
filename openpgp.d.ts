@@ -58,7 +58,7 @@ export abstract class Key {
   public signAllUsers(privateKeys: PrivateKey[], date?: Date, config?: Config): Promise<this>
   public verifyPrimaryKey(date?: Date, userID?: UserID, config?: Config): Promise<void>; // throws on error
   public verifyPrimaryUser(publicKeys: PublicKey[], date?: Date, userIDs?: UserID, config?: Config): Promise<{ keyID: KeyID, valid: boolean | null }[]>;
-  public verifyAllUsers(publicKeys: PublicKey[], date?: Date, config?: Config): Promise<{ userID: string, keyID: KeyID, valid: boolean | null }[]>;
+  public verifyAllUsers(publicKeys?: PublicKey[], date?: Date, config?: Config): Promise<{ userID: string, keyID: KeyID, valid: boolean | null }[]>;
   public isRevoked(signature?: SignaturePacket, key?: AnyKeyPacket, date?: Date, config?: Config): Promise<boolean>;
   public getRevocationCertificate(date?: Date, config?: Config): Promise<MaybeStream<string> | undefined>;
   public getEncryptionKey(keyID?: KeyID, date?: Date | null, userID?: UserID, config?: Config): Promise<this | Subkey>;
@@ -98,6 +98,10 @@ export class Subkey {
   public getCreationTime(): Date;
   public getAlgorithmInfo(): AlgorithmInfo;
   public getKeyID(): KeyID;
+  public getExpirationTime(date?: Date, config?: Config): Promise<Date | typeof Infinity | null>
+  public isRevoked(signature: SignaturePacket, key: AnyKeyPacket, date?: Date, config?: Config): Promise<boolean>;
+  public update(subKey: Subkey, date?: Date, config?: Config): Promise<void>
+  public revoke(primaryKey: SecretKeyPacket, reasonForRevocation?: ReasonForRevocation, date?: Date, config?: Config): Promise<Subkey>;
 }
 
 export interface User {
@@ -111,6 +115,7 @@ export interface User {
 export interface PrimaryUser {
   index: number;
   user: User;
+  selfCertification: SignaturePacket;
 }
 
 type AlgorithmInfo = {
@@ -163,7 +168,7 @@ export class CleartextMessage {
    *
    *  @param privateKeys private keys with decrypted secret key data for signing
    */
-  sign(privateKeys: PrivateKey[], signature?: Signature, signingKeyIDs?: KeyID[], date?: Date, userIDs?: UserID[], config?: Config): void;
+  sign(privateKeys: PrivateKey[], signature?: Signature, signingKeyIDs?: KeyID[], date?: Date, userIDs?: UserID[], notations?: RawNotation[], config?: Config): void;
 
   /** Verify signatures of cleartext signed message
    *  @param keys array of keys to verify signatures
@@ -223,18 +228,17 @@ export function decrypt<T extends MaybeStream<Data>>(options: DecryptOptions & {
   string
 }>;
 
-export function verify<T extends MaybeStream<Data>>(options: VerifyOptions & { message: Message<T>, format: 'binary' }): Promise<VerifyMessageResult & {
-  data:
+export function verify(options: VerifyOptions & { message: CleartextMessage, format?: 'utf8' }): Promise<VerifyMessageResult<string>>;
+export function verify<T extends MaybeStream<Data>>(options: VerifyOptions & { message: Message<T>, format: 'binary' }): Promise<VerifyMessageResult<
   T extends WebStream<infer X> ? WebStream<Uint8Array> :
   T extends NodeStream<infer X> ? NodeStream<Uint8Array> :
   Uint8Array
-}>;
-export function verify<T extends MaybeStream<Data>>(options: VerifyOptions & { message: Message<T> }): Promise<VerifyMessageResult & {
-  data:
+>>;
+export function verify<T extends MaybeStream<Data>>(options: VerifyOptions & { message: Message<T> }): Promise<VerifyMessageResult<
   T extends WebStream<infer X> ? WebStream<string> :
   T extends NodeStream<infer X> ? NodeStream<string> :
   string
-}>;
+>>;
 
 /** Class that represents an OpenPGP message.  Can be an encrypted message, signed message, compressed message or literal message
  */
@@ -282,7 +286,7 @@ export class Message<T extends MaybeStream<Data>> {
   /** Sign the message (the literal data packet of the message)
       @param signingKeys private keys with decrypted secret key data for signing
   */
-  public sign(signingKeys: PrivateKey[], signature?: Signature, signingKeyIDs?: KeyID[], date?: Date, userIDs?: UserID[], config?: Config): Promise<Message<T>>;
+  public sign(signingKeys: PrivateKey[], signature?: Signature, signingKeyIDs?: KeyID[], date?: Date, userIDs?: UserID[], notations?: RawNotation[], config?: Config): Promise<Message<T>>;
 
   /** Unwrap compressed message
    */
@@ -391,6 +395,7 @@ declare abstract class BaseSecretKeyPacket extends BasePublicKeyPacket {
   public decrypt(passphrase: string): Promise<void>; // throws on error
   public validate(): Promise<void>; // throws on error
   public isDummy(): boolean;
+  public isMissingSecretKeyMaterial(): boolean;
   public makeDummy(config?: Config): void;
 }
 
@@ -427,7 +432,7 @@ export class PublicKeyEncryptedSessionKeyPacket extends BasePacket {
   private encrypt(keyPacket: PublicKeyPacket): void; // throws on error
 }
 
-export class SymEncryptedSessionKey extends BasePacket {
+export class SymEncryptedSessionKeyPacket extends BasePacket {
   static readonly tag: enums.packet.symEncryptedSessionKey;
   private decrypt(passphrase: string): Promise<void>;
   private encrypt(passphrase: string, config?: Config): Promise<void>;
@@ -529,6 +534,7 @@ export interface RawNotation {
   name: string;
   value: Uint8Array;
   humanReadable: boolean;
+  critical: boolean;
 }
 
 export class TrustPacket extends BasePacket {
@@ -601,6 +607,8 @@ interface EncryptOptions {
   signingUserIDs?: MaybeArray<UserID>;
   /** (optional) array of user IDs to encrypt for, e.g. { name:'Robert Receiver', email:'robert@openpgp.org' } */
   encryptionUserIDs?: MaybeArray<UserID>;
+  /** (optional) array of notations to add to the signatures, e.g. { name: 'test@example.org', value: new TextEncoder().encode('test'), humanReadable: true, critical: false } */
+  signatureNotations?: MaybeArray<RawNotation>;
   config?: PartialConfig;
 }
 
@@ -634,6 +642,7 @@ interface SignOptions {
   signingKeyIDs?: MaybeArray<KeyID>;
   date?: Date;
   signingUserIDs?: MaybeArray<UserID>;
+  signatureNotations?: MaybeArray<RawNotation>;
   config?: PartialConfig;
 }
 
@@ -649,7 +658,7 @@ interface VerifyOptions {
   /** (optional) detached signature for verification */
   signature?: Signature;
   /** (optional) use the given date for verification instead of the current time */
-  date?: Date;
+  date?: Date | null;
   config?: PartialConfig;
 }
 
@@ -712,8 +721,8 @@ interface DecryptMessageResult {
   filename: string;
 }
 
-interface VerifyMessageResult {
-  data: MaybeStream<Data>;
+interface VerifyMessageResult<T extends MaybeStream<Data> = MaybeStream<Data>> {
+  data: T;
   signatures: VerificationResult[];
 }
 
@@ -721,7 +730,7 @@ interface VerifyMessageResult {
 /**
  * Armor an OpenPGP binary packet block
  */
-export function armor(messagetype: enums.armor, body: object, partindex?: number, parttotal?: number, config?: Config): string;
+export function armor(messagetype: enums.armor, body: object, partindex?: number, parttotal?: number, customComment?: string, config?: Config): string;
 
 /**
  * DeArmor an OpenPGP armored message; verify the checksum and return the encoded bytes
@@ -811,7 +820,9 @@ export namespace enums {
     dsa = 17,
     ecdh = 18,
     ecdsa = 19,
+    /** @deprecated use `eddsaLegacy` instead */
     eddsa = 22,
+    eddsaLegacy = 22,
     aedh = 23,
     aedsa = 24,
   }
@@ -820,8 +831,12 @@ export namespace enums {
     p256 = 'p256',
     p384 = 'p384',
     p521 = 'p521',
+    /** @deprecated use `ed25519Legacy` instead */
     ed25519 = 'ed25519',
+    ed25519Legacy = 'ed25519',
+    /** @deprecated use `curve25519Legacy` instead */
     curve25519 = 'curve25519',
+    curve25519Legacy = 'curve25519',
     secp256k1 = 'secp256k1',
     brainpoolP256r1 = 'brainpoolP256r1',
     brainpoolP384r1 = 'brainpoolP384r1',

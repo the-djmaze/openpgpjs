@@ -178,6 +178,14 @@ export default {
    */
   ignoreMalformedPackets: false,
   /**
+   * Parsing of packets is normally restricted to a predefined set of packets. For example a Sym. Encrypted Integrity Protected Data Packet can only
+   * contain a certain set of packets including LiteralDataPacket. With this setting we can allow additional packets, which is probably not advisable
+   * as a global config setting, but can be used for specific function calls (e.g. decrypt method of Message).
+   * @memberof module:config
+   * @property {Array} additionalAllowedPackets Allow additional packets on parsing. Defined as array of packet classes, e.g. [PublicKeyPacket]
+   */
+  additionalAllowedPackets: [],
+  /**
    * @memberof module:config
    * @property {Boolean} showVersion Whether to include {@link module:config/config.versionString} in armored messages
    */
@@ -210,7 +218,7 @@ export default {
    * @memberof module:config
    * @property {Array} knownNotations
    */
-  knownNotations: ['preferred-email-encoding@pgp.com', 'pka-address@gnupg.org'],
+  knownNotations: [],
   /**
    * Whether to use the indutny/elliptic library for curves (other than Curve25519) that are not supported by the available native crypto API.
    * When false, certain standard curves will not be supported (depending on the platform).

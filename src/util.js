@@ -25,9 +25,10 @@
 
 import * as stream from '@openpgp/web-stream-tools';
 import { getBigInteger } from './biginteger';
+import enums from './enums';
 
 const util = {
-  isString: data => null != data && (typeof data === 'string' || Object.prototype.isPrototypeOf.call(data, String)),
+  isString: data => typeof data === 'string' || data instanceof String,
 
   isArray: data => Array.isArray(data),
 
@@ -336,11 +337,6 @@ const util = {
   getWebCrypto: () => crypto.subtle,
 
   /**
-   * Detect native BigInt support
-   */
-  detectBigInt: () => typeof BigInt !== 'undefined',
-
-  /**
    * Get BigInteger class
    * It wraps the native BigInt type if it's available
    * Otherwise it relies on bn.js
@@ -355,7 +351,7 @@ const util = {
     if (!util.isString(data)) {
       return false;
     }
-    const re = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+([a-zA-Z]{2,}|xn--[a-zA-Z\-0-9]+)))$/;
+    const re = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+([a-zA-Z]{2,}[0-9]*|xn--[a-zA-Z\-0-9]+)))$/;
     return re.test(data);
   },
 
@@ -533,7 +529,11 @@ const util = {
    * @param {Uint8} b
    * @returns `a` if `cond` is true, `b` otherwise
    */
-  selectUint8: (cond, a, b) => (a & (256 - cond)) | (b & (255 + cond))
+  selectUint8: (cond, a, b) => (a & (256 - cond)) | (b & (255 + cond)),
+  /**
+   * @param {module:enums.symmetric} cipherAlgo
+   */
+  isAES: cipherAlgo => cipherAlgo === enums.symmetric.aes128 || cipherAlgo === enums.symmetric.aes192 || cipherAlgo === enums.symmetric.aes256
 };
 
 export default util;

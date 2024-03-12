@@ -1,17 +1,15 @@
+const sandbox = require('sinon/lib/sinon/sandbox');
+const { use: chaiUse, expect } = require('chai');
+chaiUse(require('chai-as-promised'));
+
 const openpgp = typeof window !== 'undefined' && window.openpgp ? window.openpgp : require('../..');
 const elliptic_curves = require('../../src/crypto/public_key/elliptic');
 const hashMod = require('../../src/crypto/hash');
 const config = require('../../src/config');
 const util = require('../../src/util');
 
-const sandbox = require('sinon/lib/sinon/sandbox');
-const chai = require('chai');
-
 const elliptic_data = require('./elliptic_data');
 
-chai.use(require('chai-as-promised'));
-
-const expect = chai.expect;
 const key_data = elliptic_data.key_data;
 /* eslint-disable no-invalid-this */
 module.exports = () => describe('Elliptic Curve Cryptography @lightweight', function () {
@@ -61,10 +59,10 @@ module.exports = () => describe('Elliptic Curve Cryptography @lightweight', func
   describe('Basic Operations', function () {
     it('Creating curve from name or oid', function (done) {
       Object.keys(openpgp.enums.curve).forEach(function(name_or_oid) {
-        expect(new elliptic_curves.Curve(name_or_oid)).to.exist;
+        expect(new elliptic_curves.CurveWithOID(name_or_oid)).to.exist;
       });
       Object.values(openpgp.enums.curve).forEach(function(name_or_oid) {
-        expect(new elliptic_curves.Curve(name_or_oid)).to.exist;
+        expect(new elliptic_curves.CurveWithOID(name_or_oid)).to.exist;
       });
       done();
     });
@@ -75,7 +73,7 @@ module.exports = () => describe('Elliptic Curve Cryptography @lightweight', func
       const names = config.useIndutnyElliptic ? ['p256', 'p384', 'p521', 'secp256k1', 'curve25519', 'brainpoolP256r1', 'brainpoolP384r1', 'brainpoolP512r1'] :
         ['p256', 'p384', 'p521', 'curve25519'];
       return Promise.all(names.map(function (name) {
-        const curve = new elliptic_curves.Curve(name);
+        const curve = new elliptic_curves.CurveWithOID(name);
         return curve.genKeyPair().then(keyPair => {
           expect(keyPair).to.exist;
         });
@@ -245,7 +243,7 @@ module.exports = () => describe('Elliptic Curve Cryptography @lightweight', func
         .to.eventually.be.true.notify(done);
     });
     it('Sign and verify message', function () {
-      const curve = new elliptic_curves.Curve('p521');
+      const curve = new elliptic_curves.CurveWithOID('p521');
       return curve.genKeyPair().then(async keyPair => {
         const keyPublic = new Uint8Array(keyPair.publicKey);
         const keyPrivate = new Uint8Array(keyPair.privateKey);

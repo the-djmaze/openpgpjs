@@ -26,8 +26,6 @@ import util from '../util';
 import User from './user';
 import Subkey from './subkey';
 import * as helper from './helper';
-import PrivateKey from './private_key';
-import PublicKey from './public_key';
 import { UnparseablePacket } from '../packet/packet';
 
 // A key revocation certificate can contain the following packets
@@ -63,7 +61,7 @@ class Key {
 
       if (packet instanceof UnparseablePacket) {
         const isUnparseableKeyPacket = keyPacketTags.has(packet.tag);
-        if (isUnparseableKeyPacket && !ignoreUntil){
+        if (isUnparseableKeyPacket && !ignoreUntil) {
           // Since non-key packets apply to the preceding key packet, if a (sub)key is Unparseable we must
           // discard all non-key packets that follow, until another (sub)key packet is found.
           if (mainKeyPacketTags.has(packet.tag)) {
@@ -170,13 +168,13 @@ class Key {
   }
 
   /**
-   * Clones the key object
-   * @param {Boolean} [deep=false] Whether to return a deep clone
+   * Clones the key object. The copy is shallow, as it references the same packet objects as the original. However, if the top-level API is used, the two key instances are effectively independent.
+   * @param {Boolean} [clonePrivateParams=false] Only relevant for private keys: whether the secret key paramenters should be deeply copied. This is needed if e.g. `encrypt()` is to be called either on the clone or the original key.
    * @returns {Promise<Key>} Clone of the key.
    */
-  clone(deep = false) {
+  clone(clonePrivateParams = false) {
     const key = new this.constructor(this.toPacketList());
-    if (deep) {
+    if (clonePrivateParams) {
       key.getKeys().forEach(k => {
         // shallow clone the key packets
         k.keyPacket = Object.create(
@@ -471,7 +469,7 @@ class Key {
       throw exception || new Error('Could not find primary user');
     }
     await Promise.all(users.map(async function (a) {
-      return a.user.revoked || a.user.isRevoked(a.selfCertification, null, date, config);
+      return a.selfCertification.revoked || a.user.isRevoked(a.selfCertification, null, date, config);
     }));
     // sort by primary user flag and signature creation time
     const primaryUser = users.sort(function(a, b) {
@@ -694,7 +692,8 @@ class Key {
 
       results.push(...signatures.map(
         signature => ({
-          userID: user.userID.userID,
+          userID: user.userID ? user.userID.userID : null,
+          userAttribute: user.userAttribute,
           keyID: signature.keyID,
           valid: signature.valid
         }))
@@ -710,21 +709,3 @@ class Key {
 });
 
 export default Key;
-
-/**
- * Creates a PublicKey or PrivateKey depending on the packetlist in input
- * @param {PacketList} - packets to parse
- * @return {Key} parsed key
- * @throws if no key packet was found
- */
-export function createKey(packetlist) {
-  for (const packet of packetlist) {
-    switch (packet.constructor.tag) {
-      case enums.packet.secretKey:
-        return new PrivateKey(packetlist);
-      case enums.packet.publicKey:
-        return new PublicKey(packetlist);
-    }
-  }
-  throw new Error('No key packet found');
-}

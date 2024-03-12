@@ -25,7 +25,7 @@ import enums from '../../../enums';
 import util from '../../../util';
 import { getRandomBytes } from '../../random';
 import hash from '../../hash';
-import { Curve, webCurves, privateToJWK, rawPublicToJWK, validateStandardParams } from './curves';
+import { CurveWithOID, webCurves, privateToJWK, rawPublicToJWK, validateStandardParams } from './oid_curves';
 import { getIndutnyCurve, keyFromPrivate, keyFromPublic } from './indutnyKey';
 
 const webCrypto = util.getWebCrypto();
@@ -45,7 +45,7 @@ const webCrypto = util.getWebCrypto();
  * @async
  */
 export async function sign(oid, hashAlgo, message, publicKey, privateKey, hashed) {
-  const curve = new Curve(oid);
+  const curve = new CurveWithOID(oid);
   if (message && !util.isStream(message)) {
     const keyPair = { publicKey, privateKey };
     switch (curve.type) {
@@ -83,7 +83,7 @@ export async function sign(oid, hashAlgo, message, publicKey, privateKey, hashed
  * @async
  */
 export async function verify(oid, hashAlgo, signature, message, publicKey, hashed) {
-  const curve = new Curve(oid);
+  const curve = new CurveWithOID(oid);
   if (message && !util.isStream(message)) {
     switch (curve.type) {
       case 'web':
@@ -115,7 +115,7 @@ export async function verify(oid, hashAlgo, signature, message, publicKey, hashe
  * @async
  */
 export async function validateParams(oid, Q, d) {
-  const curve = new Curve(oid);
+  const curve = new CurveWithOID(oid);
   // Reject curves x25519 and ed25519
   if (curve.keyType !== enums.publicKey.ecdsa) {
     return false;

@@ -1,12 +1,11 @@
+const sandbox = require('sinon/lib/sinon/sandbox');
+const { use: chaiUse, expect } = require('chai');
+chaiUse(require('chai-as-promised'));
+
 const openpgp = typeof window !== 'undefined' && window.openpgp ? window.openpgp : require('../..');
 const crypto = require('../../src/crypto');
 const util = require('../../src/util');
 
-const sandbox = require('sinon/lib/sinon/sandbox');
-const chai = require('chai');
-chai.use(require('chai-as-promised'));
-
-const expect = chai.expect;
 
 module.exports = () => describe('Symmetric AES-GCM (experimental)', function() {
   let sinonSandbox;
@@ -45,11 +44,11 @@ module.exports = () => describe('Symmetric AES-GCM (experimental)', function() {
           this.skip(); // eslint-disable-line no-invalid-this
         }
         const algo = openpgp.enums.write(openpgp.enums.symmetric, algoName);
-        const key = await crypto.generateSessionKey(algo);
-        const iv = await crypto.random.getRandomBytes(crypto.mode.gcm.ivLength);
+        const key = crypto.generateSessionKey(algo);
+        const iv = crypto.random.getRandomBytes(crypto.mode.gcm.ivLength);
 
-        const nativeEncryptSpy = webCrypto ? sinonSandbox.spy(webCrypto, 'encrypt') : sinonSandbox.spy(nodeCrypto, 'createCipheriv');
-        const nativeDecryptSpy = webCrypto ? sinonSandbox.spy(webCrypto, 'decrypt') : sinonSandbox.spy(nodeCrypto, 'createDecipheriv');
+        const nativeEncryptSpy = nodeCrypto ? sinonSandbox.spy(nodeCrypto, 'createCipheriv') : sinonSandbox.spy(webCrypto, 'encrypt');
+        const nativeDecryptSpy = nodeCrypto ? sinonSandbox.spy(nodeCrypto, 'createDecipheriv') : sinonSandbox.spy(webCrypto, 'decrypt');
 
         nativeEncrypt || disableNative();
         let modeInstance = await crypto.mode.gcm(algo, key);

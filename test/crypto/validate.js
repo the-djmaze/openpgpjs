@@ -1,10 +1,9 @@
-const openpgp = typeof window !== 'undefined' && window.openpgp ? window.openpgp : require('../..');
-const chai = require('chai');
 const BN = require('bn.js');
+const { use: chaiUse, expect } = require('chai');
+chaiUse(require('chai-as-promised'));
 
-chai.use(require('chai-as-promised'));
+const openpgp = typeof window !== 'undefined' && window.openpgp ? window.openpgp : require('../..');
 
-const expect = chai.expect;
 const armoredDSAKey = `-----BEGIN PGP PRIVATE KEY BLOCK-----
 
 lQNTBF69PO8RCACHP4KLQcYOPGsGV9owTZvxnvHvvrY8W0v8xDUL3y6CLc05srF1
@@ -88,7 +87,7 @@ async function generatePrivateKeyObject(options) {
 
 /* eslint-disable no-invalid-this */
 module.exports = () => {
-  describe('EdDSA parameter validation', function() {
+  describe('EdDSA parameter validation (legacy format)', function() {
     let eddsaKey;
     before(async () => {
       eddsaKey = await generatePrivateKeyObject({ curve: 'ed25519' });

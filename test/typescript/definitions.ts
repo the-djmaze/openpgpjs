@@ -113,6 +113,12 @@ import {
 
   // Sign cleartext message (armored)
   const cleartextMessage = await createCleartextMessage({ text: 'hello' });
+  const verificationResult = await verify({ message: cleartextMessage, verificationKeys: publicKey });
+  const verifiedCleartextData: string = verificationResult.data;
+  expect(verifiedCleartextData).to.equal(cleartextMessage.getText());
+  // @ts-expect-error Binary output not available for cleartext messages
+  try { await verify({ message: cleartextMessage, verificationKeys: publicKey, format: 'binary' }) } catch (e) {}
+
   const clearSignedArmor = await sign({ signingKeys: privateKeys, message: cleartextMessage });
   expect(clearSignedArmor).to.include('-----BEGIN PGP SIGNED MESSAGE-----');
   const clearSignedObject: CleartextMessage = await sign({ signingKeys: privateKeys, message: cleartextMessage, format: 'object' });
@@ -133,6 +139,15 @@ import {
   expect(binarySignedObject).to.be.instanceOf(Message);
   const textSignedObject: Message<string> = await sign({ signingKeys: privateKeys, message: textMessage, format: 'object' });
   expect(textSignedObject).to.be.instanceOf(Message);
+
+  // Sign text message (armored)
+  const textSignedWithNotations: string = await sign({ signingKeys: privateKeys, message: textMessage, signatureNotations: [{
+    name: 'test@example.org',
+    value: new TextEncoder().encode('test'),
+    humanReadable: true,
+    critical: false
+  }] });
+  expect(textSignedWithNotations).to.include('-----BEGIN PGP MESSAGE-----');
 
   // Verify signed text message (armored)
   const signedMessage = await readMessage({ armoredMessage: textSignedArmor });

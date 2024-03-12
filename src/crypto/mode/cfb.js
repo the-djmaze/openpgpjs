@@ -24,8 +24,7 @@
 
 import { AES_CFB } from '@openpgp/asmcrypto.js/dist_es8/aes/cfb';
 import * as stream from '@openpgp/web-stream-tools';
-import { getCipher } from '../crypto';
-import * as cipher from '../cipher';
+import getCipher from '../cipher/getCipher';
 import util from '../../util';
 import enums from '../../enums';
 
@@ -42,11 +41,12 @@ const webCrypto = util.getWebCrypto();
  */
 export async function encrypt(algo, key, plaintext, iv, config) {
   const algoName = enums.read(enums.symmetric, algo);
-  if (algoName.substr(0, 3) === 'aes') {
+  if (util.isAES(algo)) {
     return aesEncrypt(algo, key, plaintext, iv, config);
   }
 
-  const cipherfn = new cipher[algoName](key);
+  const Cipher = getCipher(algo);
+  const cipherfn = new Cipher(key);
   const block_size = cipherfn.blockSize;
 
   const blockc = iv.slice();
@@ -81,11 +81,12 @@ export async function encrypt(algo, key, plaintext, iv, config) {
  */
 export async function decrypt(algo, key, ciphertext, iv) {
   const algoName = enums.read(enums.symmetric, algo);
-  if (algoName.substr(0, 3) === 'aes') {
+  if (util.isAES(algo)) {
     return aesDecrypt(algo, key, ciphertext, iv);
   }
 
-  const cipherfn = new cipher[algoName](key);
+  const Cipher = getCipher(algo);
+  const cipherfn = new Cipher(key);
   const block_size = cipherfn.blockSize;
 
   let blockp = iv;
@@ -99,7 +100,7 @@ export async function decrypt(algo, key, ciphertext, iv) {
     let j = 0;
     while (chunk ? ct.length >= block_size : ct.length) {
       const decblock = cipherfn.encrypt(blockp);
-      blockp = ct;
+      blockp = ct.subarray(0, block_size);
       for (i = 0; i < block_size; i++) {
         plaintext[j++] = blockp[i] ^ decblock[i];
       }

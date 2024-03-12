@@ -241,7 +241,7 @@ export class Message {
                 pkeskPacketCopy.read(serialisedPKESK);
                 const randomSessionKey = {
                   sessionKeyAlgorithm,
-                  sessionKey: await crypto.generateSessionKey(sessionKeyAlgorithm)
+                  sessionKey: crypto.generateSessionKey(sessionKeyAlgorithm)
                 };
                 try {
                   await pkeskPacketCopy.decrypt(decryptionKeyPacket, randomSessionKey);
@@ -345,7 +345,16 @@ export class Message {
       enums.read(enums.aead, await getPreferredAlgo('aead', encryptionKeys, date, userIDs, config)) :
       undefined;
 
-    const sessionKeyData = await crypto.generateSessionKey(algo);
+    await Promise.all(encryptionKeys.map(key => key.getEncryptionKey()
+      .catch(() => null) // ignore key strength requirements
+      .then(maybeKey => {
+        if (maybeKey && (maybeKey.keyPacket.algorithm === enums.publicKey.x25519) && !util.isAES(algo)) {
+          throw new Error('Could not generate a session key compatible with the given `encryptionKeys`: X22519 keys can only be used to encrypt AES session keys; change `config.preferredSymmetricAlgorithm` accordingly.');
+        }
+      })
+    ));
+
+    const sessionKeyData = crypto.generateSessionKey(algo);
     return { data: sessionKeyData, algorithm: algorithmName, aeadAlgorithm: aeadAlgorithmName };
   }
 
@@ -476,11 +485,12 @@ export class Message {
    * @param {Array<module:type/keyid~KeyID>} [signingKeyIDs] - Array of key IDs to use for signing. Each signingKeyIDs[i] corresponds to signingKeys[i]
    * @param {Date} [date] - Override the creation time of the signature
    * @param {Array} [userIDs] - User IDs to sign with, e.g. [{ name:'Steve Sender', email:'steve@openpgp.org' }]
+   * @param {Array} [notations] - Notation Data to add to the signatures, e.g. [{ name: 'test@example.org', value: new TextEncoder().encode('test'), humanReadable: true, critical: false }]
    * @param {Object} [config] - Full configuration, defaults to openpgp.config
    * @returns {Promise<Message>} New message with signed content.
    * @async
    */
-  async sign(signingKeys = [], signature = null, signingKeyIDs = [], date = new Date(), userIDs = [], config = defaultConfig) {
+  async sign(signingKeys = [], signature = null, signingKeyIDs = [], date = new Date(), userIDs = [], notations = [], config = defaultConfig) {
     const packetlist = new PacketList();
 
     const literalDataPacket = this.packets.findPacket(enums.packet.literalData);
@@ -530,7 +540,7 @@ export class Message {
     });
 
     packetlist.push(literalDataPacket);
-    packetlist.push(...(await createSignaturePackets(literalDataPacket, signingKeys, signature, signingKeyIDs, date, userIDs, false, config)));
+    packetlist.push(...(await createSignaturePackets(literalDataPacket, signingKeys, signature, signingKeyIDs, date, userIDs, notations, false, config)));
 
     return new Message(packetlist);
   }
@@ -563,16 +573,17 @@ export class Message {
    * @param {Array<module:type/keyid~KeyID>} [signingKeyIDs] - Array of key IDs to use for signing. Each signingKeyIDs[i] corresponds to signingKeys[i]
    * @param {Date} [date] - Override the creation time of the signature
    * @param {Array} [userIDs] - User IDs to sign with, e.g. [{ name:'Steve Sender', email:'steve@openpgp.org' }]
+   * @param {Array} [notations] - Notation Data to add to the signatures, e.g. [{ name: 'test@example.org', value: new TextEncoder().encode('test'), humanReadable: true, critical: false }]
    * @param {Object} [config] - Full configuration, defaults to openpgp.config
    * @returns {Promise<Signature>} New detached signature of message content.
    * @async
    */
-  async signDetached(signingKeys = [], signature = null, signingKeyIDs = [], date = new Date(), userIDs = [], config = defaultConfig) {
+  async signDetached(signingKeys = [], signature = null, signingKeyIDs = [], date = new Date(), userIDs = [], notations = [], config = defaultConfig) {
     const literalDataPacket = this.packets.findPacket(enums.packet.literalData);
     if (!literalDataPacket) {
       throw new Error('No literal data packet to sign.');
     }
-    return new Signature(await createSignaturePackets(literalDataPacket, signingKeys, signature, signingKeyIDs, date, userIDs, true, config));
+    return new Signature(await createSignaturePackets(literalDataPacket, signingKeys, signature, signingKeyIDs, date, userIDs, notations, true, config));
   }
 
   /**
@@ -650,7 +661,7 @@ export class Message {
     if (literalDataList.length !== 1) {
       throw new Error('Can only verify message with one literal data packet.');
     }
-    const signatureList = signature.packets;
+    const signatureList = signature.packets.filterByTag(enums.packet.signature); // drop UnparsablePackets
     return createVerificationObjects(signatureList, literalDataList, verificationKeys, date, true, config);
   }
 
@@ -705,13 +716,14 @@ export class Message {
  * @param {Array<module:type/keyid~KeyID>} [signingKeyIDs] - Array of key IDs to use for signing. Each signingKeyIDs[i] corresponds to signingKeys[i]
  * @param {Date} [date] - Override the creationtime of the signature
  * @param {Array} [userIDs] - User IDs to sign with, e.g. [{ name:'Steve Sender', email:'steve@openpgp.org' }]
+ * @param {Array} [notations] - Notation Data to add to the signatures, e.g. [{ name: 'test@example.org', value: new TextEncoder().encode('test'), humanReadable: true, critical: false }]
  * @param {Boolean} [detached] - Whether to create detached signature packets
  * @param {Object} [config] - Full configuration, defaults to openpgp.config
  * @returns {Promise<PacketList>} List of signature packets.
  * @async
  * @private
  */
-export async function createSignaturePackets(literalDataPacket, signingKeys, signature = null, signingKeyIDs = [], date = new Date(), userIDs = [], detached = false, config = defaultConfig) {
+export async function createSignaturePackets(literalDataPacket, signingKeys, signature = null, signingKeyIDs = [], date = new Date(), userIDs = [], notations = [], detached = false, config = defaultConfig) {
   const packetlist = new PacketList();
 
   // If data packet was created from Uint8Array, use binary, otherwise use text
@@ -724,7 +736,7 @@ export async function createSignaturePackets(literalDataPacket, signingKeys, sig
       throw new Error('Need private key for signing');
     }
     const signingKey = await primaryKey.getSigningKey(signingKeyIDs[i], date, userID, config);
-    return createSignaturePacket(literalDataPacket, primaryKey, signingKey.keyPacket, { signatureType }, date, userID, detached, config);
+    return createSignaturePacket(literalDataPacket, primaryKey, signingKey.keyPacket, { signatureType }, date, userID, notations, detached, config);
   })).then(signatureList => {
     packetlist.push(...signatureList);
   });

@@ -1,17 +1,14 @@
 /* eslint-disable max-lines */
+const stream = require('@openpgp/web-stream-tools');
+const stub = require('sinon/lib/sinon/stub');
+const { use: chaiUse, expect } = require('chai');
+chaiUse(require('chai-as-promised'));
 
 const openpgp = typeof window !== 'undefined' && window.openpgp ? window.openpgp : require('../..');
 const crypto = require('../../src/crypto');
 const util = require('../../src/util');
 
-const stream = require('@openpgp/web-stream-tools');
-
-const stub = require('sinon/lib/sinon/stub');
-const chai = require('chai');
-chai.use(require('chai-as-promised'));
-
-const { expect } = chai;
-const input = require('./testInputs.js');
+const input = require('./testInputs');
 
 function stringify(array) {
   if (stream.isStream(array)) {
@@ -205,7 +202,7 @@ module.exports = () => describe('Packet', function() {
 
   it('Sym. encrypted AEAD protected packet is encrypted in parallel (AEAD, GCM)', async function() {
     const webCrypto = util.getWebCrypto();
-    if (!webCrypto) return;
+    if (!webCrypto || util.getNodeCrypto()) return;
     const encryptStub = cryptStub(webCrypto, 'encrypt');
     const decryptStub = cryptStub(webCrypto, 'decrypt');
 
@@ -1035,6 +1032,18 @@ kePFjAnu9cpynKXu3usf8+FuBw2zLsg1Id1n7ttxoAte416KjBN9lFBt8mcu
       ).to.be.rejectedWith(/Unknown public key encryption algorithm/);
     });
 
+    it('Ignores unknown SKESK s2k only with `config.ignoreUnsupportedPackets` enabled', async function() {
+      const binaryMessage = util.hexToUint8Array('c1c0cc037c2faa4df93c37b2010c009bb74119f098efa43c7924b2effc7d32fc6d7bf7f6952d2cab1722d3192cfb9b90448592770dcbaed4ef377f73a110a7e208a87a74c18fc4088c60bb0f3abcba32551c8b0e69f3505a0717cfd998261f8ffd166a5e029c504ccd58c100abef7be78aef9650df36b9757ae864b20dda598feb9799128d959a525eee6e1dd7a609117cdc922ab98dce5ea89b498005d609e54e4ec8ff330c648c375a1f56618ebd34c15db928775b6d0ec50316796ea384ebc224737ba861e3b0254817d53d0c26b517eba9ba79f56a9cae4d75b34144f752bea81fd4fbbb17fd36c9c2c387ddb23356e928b5ba47ef7164b6e2ccfe80662321add5c23dc162dc09eda77f2f4c4b04c1d59061bf8625d8c9705fc377cc8b9f9e746e62b0b0d990dd20a3ff8478101efc3e4329e66ce2f3e915657bccf94a77a357055c22a68b23cc8f563e0baef17904c488ea885e8d0cff6b27fbf5e609c2334d1c26ea7445b58a3f9182cdbad8cfd540237b4b495a24fb9bf59a96600c547141c22b4e5adc8dfa292719efeca1c3500409170861616161616161614141414161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161d20101');
+
+      const parsed = await openpgp.PacketList.fromBinary(binaryMessage, allAllowedPackets, { ...openpgp.config, ignoreUnsupportedPackets: true });
+      expect(parsed.length).to.equal(3);
+      expect(parsed[1]).instanceOf(openpgp.UnparseablePacket);
+      expect(parsed[1].tag).to.equal(openpgp.enums.packet.symEncryptedSessionKey);
+
+      await expect(
+        openpgp.PacketList.fromBinary(binaryMessage, allAllowedPackets, { ...openpgp.config, ignoreUnsupportedPackets: false })
+      ).to.be.rejectedWith(/Unknown S2K type/);
+    });
 
     it('Throws on disallowed packet even with tolerant mode enabled', async function() {
       const packets = new openpgp.PacketList();
@@ -1054,6 +1063,21 @@ kePFjAnu9cpynKXu3usf8+FuBw2zLsg1Id1n7ttxoAte416KjBN9lFBt8mcu
       const parsed = await openpgp.PacketList.fromBinary(bytes, allAllowedPackets, { ...openpgp.config, maxUserIDLength: 2, ignoreMalformedPackets: true });
       expect(parsed.length).to.equal(1);
       expect(parsed[0].tag).to.equal(openpgp.enums.packet.userID);
+    });
+
+    it('Allow parsing of additional packets provided in `config.additionalAllowedPackets`', async function () {
+      const packets = new openpgp.PacketList();
+      packets.push(new openpgp.LiteralDataPacket());
+      packets.push(openpgp.UserIDPacket.fromObject({ name:'test', email:'test@a.it' }));
+      const bytes = packets.write();
+      const allowedPackets = { [openpgp.enums.packet.literalData]: openpgp.LiteralDataPacket };
+      await expect(openpgp.PacketList.fromBinary(bytes, allowedPackets)).to.be.rejectedWith(/Packet not allowed in this context: userID/);
+      const parsed = await openpgp.PacketList.fromBinary(bytes, allowedPackets, { ...openpgp.config, additionalAllowedPackets: [openpgp.UserIDPacket] });
+      expect(parsed.length).to.equal(1);
+      expect(parsed[0].constructor.tag).to.equal(openpgp.enums.packet.literalData);
+      const otherPackets = await stream.readToEnd(parsed.stream, _ => _);
+      expect(otherPackets.length).to.equal(1);
+      expect(otherPackets[0].constructor.tag).to.equal(openpgp.enums.packet.userID);
     });
   });
 });

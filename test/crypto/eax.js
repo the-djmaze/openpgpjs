@@ -1,15 +1,13 @@
 // Modified by ProtonTech AG
 
 // Adapted from https://github.com/artjomb/cryptojs-extension/blob/8c61d159/test/eax.js
+const sandbox = require('sinon/lib/sinon/sandbox');
+const { use: chaiUse, expect } = require('chai');
+chaiUse(require('chai-as-promised'));
+
 const openpgp = typeof window !== 'undefined' && window.openpgp ? window.openpgp : require('../..');
 const EAX = require('../../src/crypto/mode/eax');
 const util = require('../../src/util');
-
-const sandbox = require('sinon/lib/sinon/sandbox');
-const chai = require('chai');
-chai.use(require('chai-as-promised'));
-
-const expect = chai.expect;
 
 function testAESEAX() {
   it('Passes all test vectors', async function() {
@@ -125,6 +123,7 @@ function testAESEAX() {
   });
 }
 
+/* eslint-disable no-invalid-this */
 module.exports = () => describe('Symmetric AES-EAX', function() {
   let sinonSandbox;
   let getWebCryptoStub;
@@ -142,6 +141,11 @@ module.exports = () => describe('Symmetric AES-EAX', function() {
   };
 
   describe('Symmetric AES-EAX (native)', function() {
+    before(function () {
+      const detectNative = () => !!(util.getWebCrypto() || util.getNodeCrypto());
+      if (!detectNative()) { this.skip(); }
+    });
+
     beforeEach(function () {
       sinonSandbox = sandbox.create();
       enableNative();

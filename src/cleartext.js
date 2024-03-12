@@ -64,14 +64,15 @@ export class CleartextMessage {
    * @param {Array<module:type/keyid~KeyID>} [signingKeyIDs] - Array of key IDs to use for signing. Each signingKeyIDs[i] corresponds to privateKeys[i]
    * @param {Date} [date] - The creation time of the signature that should be created
    * @param {Array} [userIDs] - User IDs to sign with, e.g. [{ name:'Steve Sender', email:'steve@openpgp.org' }]
+   * @param {Array} [notations] - Notation Data to add to the signatures, e.g. [{ name: 'test@example.org', value: new TextEncoder().encode('test'), humanReadable: true, critical: false }]
    * @param {Object} [config] - Full configuration, defaults to openpgp.config
    * @returns {Promise<CleartextMessage>} New cleartext message with signed content.
    * @async
    */
-  async sign(privateKeys, signature = null, signingKeyIDs = [], date = new Date(), userIDs = [], config = defaultConfig) {
+  async sign(privateKeys, signature = null, signingKeyIDs = [], date = new Date(), userIDs = [], notations = [], config = defaultConfig) {
     const literalDataPacket = new LiteralDataPacket();
     literalDataPacket.setText(this.text);
-    const newSignature = new Signature(await createSignaturePackets(literalDataPacket, privateKeys, signature, signingKeyIDs, date, userIDs, true, config));
+    const newSignature = new Signature(await createSignaturePackets(literalDataPacket, privateKeys, signature, signingKeyIDs, date, userIDs, notations, true, config));
     return new CleartextMessage(this.text, newSignature);
   }
 
@@ -88,7 +89,7 @@ export class CleartextMessage {
    * @async
    */
   verify(keys, date = new Date(), config = defaultConfig) {
-    const signatureList = this.signature.packets;
+    const signatureList = this.signature.packets.filterByTag(enums.packet.signature); // drop UnparsablePackets
     const literalDataPacket = new LiteralDataPacket();
     // we assume that cleartext signature is generated based on UTF8 cleartext
     literalDataPacket.setText(this.text);
@@ -173,7 +174,7 @@ function verifyHeaders(headers, packetlist) {
   let oneHeader = null;
   let hashAlgos = [];
   headers.forEach(function(header) {
-    oneHeader = header.match(/Hash: (.+)/); // get header value
+    oneHeader = header.match(/^Hash: (.+)$/); // get header value
     if (oneHeader) {
       oneHeader = oneHeader[1].replace(/\s/g, ''); // remove whitespace
       oneHeader = oneHeader.split(',');
