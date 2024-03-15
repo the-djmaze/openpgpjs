@@ -192,7 +192,7 @@ function createcrc24(input) {
 function verifyHeaders(headers) {
   for (let i = 0; i < headers.length; i++) {
     if (!/^([^\s:]|[^\s:][^:]*[^\s:]): .+$/.test(headers[i])) {
-      util.printDebugError(new Error('Improperly formatted armor header: ' + headers[i]));
+      throw new Error('Improperly formatted armor header: ' + headers[i]);
     }
     if (!/^(Version|Comment|MessageID|Hash|Charset): .+$/.test(headers[i])) {
       console.error(new Error('Unknown header: ' + headers[i]));
